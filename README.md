@@ -1,6 +1,7 @@
 # rns.rs
 
 This is going to become a rust port of the RNS code. The following has been taken from the header at http://www.gravity.phys.uwm.edu/rns/
+EoS files downloaded from the same url.
 
 # Rapidly Rotating Neutron Star
 RNS is a code written by Nikolaos Stergioulas which constructs models of rapidly rotating, relativistic, compact stars using tabulated equations of state which are supplied by the user. Please direct questions about this program to either [Sharon Morsink](mailto:morsink@phys.ualberta.ca) or [Nikolaos Stergioulas](mailto:niksterg@aei-potsdam.mpg.de).
