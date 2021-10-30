@@ -1,13 +1,12 @@
 
-use std::{fs::File, process::exit};
+use std::{fs::File, io::{BufRead, BufReader}};
 
-use ndarray::{Array, Array1, array};
+use ndarray::{Array, Array1, Axis, array};
 use assert_approx_eq::assert_approx_eq;
+
 use csv;
 
-
 use crate::consts::*;
-
 
 #[test]
 fn test_make_grid() {
@@ -32,7 +31,6 @@ fn test_make_grid() {
 
 }
 
-
 fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Array1<f64>,Array1<f64>){
 
     let s_dim = match s_size {
@@ -49,47 +47,103 @@ fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Array1<f64>,Arra
 
 }
 
+#[test]
+fn test_read_eos_file () {
+
+    // Ordering of the columns vectors:  rho, p, h, n0
+    let (rho, p, h, n0, n_tab) = read_eos_file("./eos/eosA");
+    assert_eq!(n_tab, 102);
+    // First row:
+    // 3.95008e+01 1.27820e+14 1.000000000000000e+00 2.379569102499467e+25 
+    assert_approx_eq!(rho[0], 3.95008e+01);
+    assert_approx_eq!(p[0], 1.27820e+14);
+    assert_approx_eq!(h[0], 1.000000000000000e+00);
+    assert_approx_eq!(n0[0], 2.379569102499467e+25 );
+    // Last row:
+    // 6.11558e+16 6.20899e+37 2.096550609129587e+21 7.612604874394090e+39 
+    assert_approx_eq!(rho[n_tab-1], 6.11558e+16);
+    assert_approx_eq!(p[n_tab-1], 6.20899e+37);
+    assert_approx_eq!(h[n_tab-1], 2.096550609129587e+21);
+    assert_approx_eq!(n0[n_tab-1], 7.612604874394090e+39 );
+}
+
+fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
+
+    // Ordering of the columns vectors:  rho, p, h, n0
+    let mut rho : Vec<f64> = vec![];
+    let mut p : Vec<f64> = vec![];
+    let mut h : Vec<f64> = vec![];
+    let mut n0 : Vec<f64> = vec![];
+
+    let file = File::open(filename).unwrap();
+    let reader = BufReader::new(file);
+    let n_tab = reader.lines()
+                            .next()
+                            .expect("Unable to read the first line in the EoS file.")
+                            .expect("Unable to convert the first line of the EoS file to a string.")
+                            .parse::<usize>()
+                            .expect("Unable to convert the first line of the EoS file to a number.");
+    
+    println!("{} lines in EoS file {}", n_tab, filename);
+
+    let mut i: usize = 0;
+    let file = File::open(filename).unwrap();
+    for res in  csv::ReaderBuilder::new()
+                                    .flexible(true)
+                                    .from_reader(file)
+                                    .records() {
+        
+        let str_rec = res.expect("Unable to read the EoS file.");
+        for str_row in str_rec.iter() {
+            i += 1;
+            for (idx, str_val) in str_row.split(' ').enumerate() {
+                if !str_val.is_empty() {
+                    let val_parse = str_val.parse::<f64>();
+                    if let Ok(val) = val_parse {
+                        // Ordering of the columns vectors:  rho, p, h, n0
+                        match idx {
+                            0 => rho.push(val),
+                            1 => p.push(val),
+                            2 => h.push(val),
+                            3 => n0.push(val),
+                            _ => (),
+                        }
+                    } else {
+                        panic!("Failed to read EoS file in line {} and column {}",i + 1 , idx + 1);
+                    }
+                }
+            }
+        }
+    }
+// Ordering of the columns vectors:  rho, p, h, n0
+    (rho, p, h, n0, n_tab)
+}
+
 
 #[test]
 fn test_load_eos () {
-    let le : Array1<f64> = array![];
-    let lp : Array1<f64> = array![];
-    let lh : Array1<f64> = array![];
-    let ln0 : Array1<f64> = array![];
-    let n : Array1<usize> = array![];
-    load_eos("./eos/eosA",le,lp,lh,ln0,n);
-
 
     
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA"); 
+    // These values measured from the RNS C code
+    assert_approx_eq!(log_e_tab[0],-1.340339410862500280e+01);
+    assert_approx_eq!(log_p_tab[0],-2.184703547104846777e+01);
+    assert_approx_eq!(log_h_tab[0],-2.095363428426100327e+01);
+    assert_approx_eq!(log_n0_tab[0], 2.537649832119548066e+01);
+    assert_approx_eq!(log_e_tab[n_tab-1], 1.786437651700104601e+00);
+    assert_approx_eq!(log_p_tab[n_tab-1], 1.839386676124790565e+00);
+    assert_approx_eq!(log_h_tab[n_tab-1], 3.678710661420371286e-01);
+    assert_approx_eq!(log_n0_tab[n_tab-1],  3.988153328870259173e+01);
+    
 }
+fn load_eos(filename: &str, ) -> (Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize) {
+    
+    let (rho, p, h, n0, n_tab) = read_eos_file(filename); 
 
-fn load_eos(filename: &str, 
-    log_e_tab: Array1<f64>,
-    log_p_tab: Array1<f64>,
-    log_h_tab: Array1<f64>,
-    log_n0_tab: Array1<f64>, 
-    n_tab: Array1<usize>) {
+    let mut log_e_tab = (Array1::from_vec(rho) * (CC * CC * KSCALE)).mapv(f64::log10);
+    let mut log_p_tab = (Array1::from_vec(p) * KSCALE).mapv(f64::log10);
+    let mut log_h_tab = (Array1::from_vec(h) / (CC*CC)).mapv(f64::log10);
+    let mut log_n0_tab = Array1::from_vec(n0).mapv(f64::log10);
 
-        let mut file = File::open(filename).unwrap();
-        let mut reader = csv::ReaderBuilder::new()
-                                        .delimiter(b' ')
-                                        .from_reader(file);
-        let mut i:usize = 0;
-        for result in reader.records() {
-            i += 1;
-            // The iterator yields Result<StringRecord, Error>, so we check the
-            // error here.
-            let record_result = result;
-            
-            let record = match record_result {
-                Ok(r) => r,
-                Err(e) => {
-                    println!("Error in record on line {}",i);
-                    println!("Error: {:?}",e);
-                    continue;
-                }
-            };
-            println!("{}: {:?}", i,record);
-        }
-
-    }
+    (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab)
+}
