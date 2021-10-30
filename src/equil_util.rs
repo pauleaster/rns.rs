@@ -1,4 +1,5 @@
-use std::cmp::max;
+use std::cmp::{min,max};
+use assert_approx_eq::assert_approx_eq;
 
 #[test]
 fn test_hunt() {
@@ -47,7 +48,7 @@ fn test_hunt() {
 /* Routine that locates nearest grid point for a given value.              */
 /* Adapted from Numerical Recipes.                                         */
 /***************************************************************************/
-fn hunt(xx: &Vec<f64>, x: f64) -> usize {
+fn hunt(xx: &[f64], x: f64) -> usize {
 
 	let n = xx.len();
     let mut jlo = n >> 1;
@@ -100,40 +101,57 @@ fn hunt(xx: &Vec<f64>, x: f64) -> usize {
     jlo
 }
 
-// /*C*/
-// /*************************************************************************/
-// /* Driver for the interpolation routine. First we find the tab. point    */
-// /* nearest to xb, then we interpolate using four points around xb.       */  
-// /*************************************************************************/
-// double interp(double xp[], 
-//               double yp[], 
-//               int    np ,
-//               double xb, 
-//               int    *n_nearest_pt)
-// { 
-//  int k,        /* index of 1st point */
-//      m=4;      /* degree of interpolation */ 
- 
-//  double y;     /* intermediate value */
+#[test]
+fn test_round_from_zero() {
+    let scale = 1e10;
+    let xvals = &[0.5 * f64::EPSILON, -0.5 * f64::EPSILON, 1.5 * f64::EPSILON, -1.5 * f64::EPSILON];
+    let results = &[f64::EPSILON, f64::EPSILON, 1.5 * f64::EPSILON, -1.5 * f64::EPSILON];
+    for (&x, &y) in xvals.iter().zip(results) {
+        assert_approx_eq!(round_from_zero(x) * scale, y * scale);
+    }
+}
 
-//  hunt(xp,np,xb,n_nearest_pt);
+fn round_from_zero (x : f64) -> f64 {
 
-//  k=IMIN(IMAX((*n_nearest_pt)-(m-1)/2,1),np+1-m);
+    match x.abs() < f64::EPSILON {
+        true => f64::EPSILON,
+        false => x,
+    }
+}
 
-//  if( xb==xp[k] ||  xb==xp[k+1] || xb==xp[k+2] || xb==xp[k+3]) 
-//     xb += DBL_EPSILON;
+#[test]
+fn test_interp() {
+    
+}
 
-//  y= (xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/
-//         ((xp[k]-xp[k+1])*(xp[k]-xp[k+2])*(xp[k]-xp[k+3]))
- 
-//     +(xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/
-//        ((xp[k+1]-xp[k])*(xp[k+1]-xp[k+2])*(xp[k+1]-xp[k+3]))
- 
-//     +(xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/
-//        ((xp[k+2]-xp[k])*(xp[k+2]-xp[k+1])*(xp[k+2]-xp[k+3]))
- 
-//     +(xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/
-//        ((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
+/*************************************************************************/
+/* Driver for the interpolation routine. First we find the tab. point    */
+/* nearest to xb, then we interpolate using four points around xb.       */  
+/*************************************************************************/
+fn interp(  xp: &[f64], 
+            yp: &[f64], 
+            xb: f64) -> f64 { 
 
-//  return (y);
-// }
+    let m=4;      /* degree of interpolation */ 
+
+    let nearest = hunt(xp,xb);
+
+    let np = xp.len();
+    let k=max(0,
+                    min(
+                        max(nearest as i32 - ((m-1)>>1) as i32,
+                            1),
+                                np as i32 - m as i32)) as usize;
+
+    // epsilon shift corrected, should eliminate (xp[i]-xp[j]).abs() < eps
+
+    let d1 = round_from_zero((xp[k]-xp[k+1])*(xp[k]-xp[k+2])*(xp[k]-xp[k+3]));
+    let d2 = round_from_zero((xp[k+1]-xp[k])*(xp[k+1]-xp[k+2])*(xp[k+1]-xp[k+3]));
+    let d3 = round_from_zero((xp[k+2]-xp[k])*(xp[k+2]-xp[k+1])*(xp[k+2]-xp[k+3]));
+    let d4 = round_from_zero((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
+
+    (xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d1
+    + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d2 
+    + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d3
+    + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4
+}

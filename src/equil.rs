@@ -147,3 +147,8 @@ fn load_eos(filename: &str, ) -> (Array1<f64>, Array1<f64>, Array1<f64>, Array1<
 
     (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab)
 }
+
+/*******************************************************************/
+fn e_of_rho0(rho0: f64, gamma_p: f64) -> f64 {
+    rho0.powf(gamma_p)/(gamma_p-1.0)+rho0
+}
