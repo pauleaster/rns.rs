@@ -121,37 +121,49 @@ fn round_from_zero (x : f64) -> f64 {
 
 #[test]
 fn test_interp() {
+
+    let xp = &[0.1_f64, 0.5,     1.0, 2.0,  2.5,  2.6,  3.0];
+    let yp = &[0.1_f64, 0.1, 0.2, 0.25, 0.26, 2.65, 2.7];
+
+    let xbvals = [0.3_f64, 1.5, 2.8];
+    let results = [0.0863625730994152_f64, 0.2400000000000000, 5.6252000000000000];
+    // let kvals = [0_usize, 1, 3];
     
+    for (idx, &xbval) in xbvals.iter().enumerate() {
+        let yb = interp(xp, yp, xbval);
+        assert_approx_eq!(yb, results[idx]);
+    }
 }
 
 /*************************************************************************/
 /* Driver for the interpolation routine. First we find the tab. point    */
 /* nearest to xb, then we interpolate using four points around xb.       */  
+/* This is a direct interpretation of polint from numerical recipes      */  
+/* Using equation 3.1.1.                                                 */  
 /*************************************************************************/
 fn interp(  xp: &[f64], 
             yp: &[f64], 
             xb: f64) -> f64 { 
 
-    let m=4;      /* degree of interpolation */ 
-
     let nearest = hunt(xp,xb);
 
     let np = xp.len();
     let k=max(0,
-                    min(
-                        max(nearest as i32 - ((m-1)>>1) as i32,
-                            1),
-                                np as i32 - m as i32)) as usize;
+                    min(nearest as i32 - 1, np as i32 - 4)) as usize;
 
     // epsilon shift corrected, should eliminate (xp[i]-xp[j]).abs() < eps
+
 
     let d1 = round_from_zero((xp[k]-xp[k+1])*(xp[k]-xp[k+2])*(xp[k]-xp[k+3]));
     let d2 = round_from_zero((xp[k+1]-xp[k])*(xp[k+1]-xp[k+2])*(xp[k+1]-xp[k+3]));
     let d3 = round_from_zero((xp[k+2]-xp[k])*(xp[k+2]-xp[k+1])*(xp[k+2]-xp[k+3]));
     let d4 = round_from_zero((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
 
+
     (xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d1
-    + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d2 
-    + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d3
-    + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4
+        + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d2 
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d3
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4
+
+    
 }
