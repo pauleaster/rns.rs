@@ -5,7 +5,7 @@ use ndarray::{Array, Array1, Axis, array};
 use assert_approx_eq::assert_approx_eq;
 use std::error::Error;
 
-use crate::equil_util::{EosType,interp};
+use crate::equil_util::{EosType, interp, rtsec_g};
 
 use csv;
 
@@ -289,3 +289,46 @@ fn  n0_at_e(ee : f64,
                         opt_nearest))
 }
 
+
+fn make_center(
+        opt_log_e_tab: Option<Array1<f64>>,
+        opt_log_p_tab: Option<Array1<f64>>,
+        opt_log_h_tab: Option<Array1<f64>>,        
+        eos_type: EosType,
+        opt_gamma_p: Option<f64>, 
+        e_center: f64) -> Result<(f64, f64),Box<dyn Error>> {
+
+
+    match eos_type {
+        EosType::Table => {
+            if let Some(log_e_tab) = opt_log_e_tab { 
+                if let Some(log_p_tab) = opt_log_p_tab { 
+                    if let Some(log_h_tab) = opt_log_h_tab { 
+                        let nearest=log_e_tab.len()>>1;
+                        let p_center = p_at_e( e_center, 
+                                log_p_tab.clone(), 
+                                log_e_tab, 
+                                Some(nearest));
+                        return Ok((p_center, 
+                            h_at_p( p_center, 
+                                    log_h_tab, 
+                                    log_p_tab, 
+                                    Some(nearest))));
+
+                    }
+                }
+            }; 
+            Err("Not all tabulated EoS found.".into())
+            
+        },
+        EosType::Polytropic => {
+            if let Some(gamma_p) = opt_gamma_p {
+                let rho0_center = rtsec_g( &e_of_rho0, gamma_p, 0.0,e_center,f64::EPSILON, 
+                                    e_center )?;
+                let p_center = rho0_center.powf(gamma_p);
+                return Ok((p_center, ((e_center+p_center)/rho0_center).ln()));
+            };
+            Err("gamma_p not supplied for EoS".into())
+        },
+    }
+}

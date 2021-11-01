@@ -1,5 +1,9 @@
 use std::cmp::{min,max};
 use assert_approx_eq::assert_approx_eq;
+use std::error::Error;
+
+use crate::consts::*;
+
 
 pub enum EosType {
     Table,
@@ -176,4 +180,47 @@ pub fn interp(  xp: &[f64],
         + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4
 
     
+}
+
+pub fn rtsec_g( func: &dyn Fn(f64, f64)-> f64, 
+            gamma_p:  f64, 
+            mut x1: f64, 
+            mut x2: f64, 
+            xacc: f64, 
+            ee: f64) -> Result<f64,Box<dyn Error>> {
+
+//  double fl,f,dx,swap, xl,rts;
+    let mut rts:f64;
+    let mut x_l:f64;
+    let swap:f64;
+ 
+    let mut f_l = func(x1,gamma_p)-ee;
+    let mut f = func(x2,gamma_p)-ee;
+
+    if f_l.abs() < f.abs() {
+        rts=x1;
+        x_l=x2;
+        swap=f_l;
+        f_l=f;
+        f=swap;
+    } else {
+        x_l=x1;
+        rts=x2;
+    }
+
+ 
+ for _j in 0..MAXIT {
+    let dx=(x_l-rts)*f/(f-f_l);
+    x_l=rts;
+    f_l=f;
+    rts += dx;
+    f = func(rts,gamma_p)-ee;
+
+    if dx.abs()<xacc || f==0.0 {
+        return Ok(rts);
+    }
+  }
+ 
+ Err("Maximum number of iterations exceeded in rtsec".into())  
+ 
 }
