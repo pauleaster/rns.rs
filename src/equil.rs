@@ -3,6 +3,9 @@ use std::{fs::File, io::{BufRead, BufReader}};
 
 use ndarray::{Array, Array1, Axis, array};
 use assert_approx_eq::assert_approx_eq;
+use std::error::Error;
+
+use crate::equil_util::{EosType,interp};
 
 use csv;
 
@@ -51,7 +54,7 @@ fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Array1<f64>,Arra
 fn test_read_eos_file () {
 
     // Ordering of the columns vectors:  rho, p, h, n0
-    let (rho, p, h, n0, n_tab) = read_eos_file("./eos/eosA");
+    let (rho, p, h, n0, n_tab) = read_eos_file("./eos/eosA").unwrap();
     assert_eq!(n_tab, 102);
     // First row:
     // 3.95008e+01 1.27820e+14 1.000000000000000e+00 2.379569102499467e+25 
@@ -67,7 +70,7 @@ fn test_read_eos_file () {
     assert_approx_eq!(n0[n_tab-1], 7.612604874394090e+39 );
 }
 
-fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize) {
+fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
 
     // Ordering of the columns vectors:  rho, p, h, n0
     let mut rho : Vec<f64> = vec![];
@@ -75,15 +78,16 @@ fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, u
     let mut h : Vec<f64> = vec![];
     let mut n0 : Vec<f64> = vec![];
 
-    let file = File::open(filename).unwrap();
+
+
+
+    let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let n_tab = reader.lines()
                             .next()
-                            .expect("Unable to read the first line in the EoS file.")
-                            .expect("Unable to convert the first line of the EoS file to a string.")
-                            .parse::<usize>()
-                            .expect("Unable to convert the first line of the EoS file to a number.");
-    
+                            .expect("Unable to read the first line in the EoS file.")?
+                            .parse::<usize>()?;
+
     println!("{} lines in EoS file {}", n_tab, filename);
 
     let mut i: usize = 0;
@@ -93,7 +97,7 @@ fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, u
                                     .from_reader(file)
                                     .records() {
         
-        let str_rec = res.expect("Unable to read the EoS file.");
+        let str_rec = res?;
         for str_row in str_rec.iter() {
             i += 1;
             for (idx, str_val) in str_row.split(' ').enumerate() {
@@ -116,7 +120,7 @@ fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, u
         }
     }
 // Ordering of the columns vectors:  rho, p, h, n0
-    (rho, p, h, n0, n_tab)
+    Ok((rho, p, h, n0, n_tab))
 }
 
 
@@ -124,31 +128,85 @@ fn read_eos_file(filename: &str, ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, u
 fn test_load_eos () {
 
     
-    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA"); 
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA").unwrap(); 
     // These values measured from the RNS C code
-    assert_approx_eq!(log_e_tab[0],-1.340339410862500280e+01);
-    assert_approx_eq!(log_p_tab[0],-2.184703547104846777e+01);
-    assert_approx_eq!(log_h_tab[0],-2.095363428426100327e+01);
-    assert_approx_eq!(log_n0_tab[0], 2.537649832119548066e+01);
-    assert_approx_eq!(log_e_tab[n_tab-1], 1.786437651700104601e+00);
-    assert_approx_eq!(log_p_tab[n_tab-1], 1.839386676124790565e+00);
-    assert_approx_eq!(log_h_tab[n_tab-1], 3.678710661420371286e-01);
-    assert_approx_eq!(log_n0_tab[n_tab-1],  3.988153328870259173e+01);
+    assert_approx_eq!(log_e_tab[0],-1.340_339_410_862_500_3e1);
+    assert_approx_eq!(log_p_tab[0],-2.184_703_547_104_846_8e1);
+    assert_approx_eq!(log_h_tab[0],-2.095_363_428_426_100_3e1);
+    assert_approx_eq!(log_n0_tab[0], 2.537_649_832_119_548e1);
+    assert_approx_eq!(log_e_tab[n_tab-1], 1.786_437_651_700_104_6e0);
+    assert_approx_eq!(log_p_tab[n_tab-1], 1.839_386_676_124_790_6e0);
+    assert_approx_eq!(log_h_tab[n_tab-1], 3.678_710_661_420_371_3e-1);
+    assert_approx_eq!(log_n0_tab[n_tab-1],  3.988_153_328_870_259e1);
     
 }
-fn load_eos(filename: &str, ) -> (Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize) {
+fn load_eos(filename: &str, ) -> Result<(Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize), Box<dyn Error>> {
     
-    let (rho, p, h, n0, n_tab) = read_eos_file(filename); 
+    let (rho, p, h, n0, n_tab) = read_eos_file(filename)?; 
 
-    let mut log_e_tab = (Array1::from_vec(rho) * (CC * CC * KSCALE)).mapv(f64::log10);
-    let mut log_p_tab = (Array1::from_vec(p) * KSCALE).mapv(f64::log10);
-    let mut log_h_tab = (Array1::from_vec(h) / (CC*CC)).mapv(f64::log10);
-    let mut log_n0_tab = Array1::from_vec(n0).mapv(f64::log10);
+    let log_e_tab = (Array1::from_vec(rho) * (CC * CC * KSCALE)).mapv(f64::log10);
+    let log_p_tab = (Array1::from_vec(p) * KSCALE).mapv(f64::log10);
+    let log_h_tab = (Array1::from_vec(h) / (CC*CC)).mapv(f64::log10);
+    let log_n0_tab = Array1::from_vec(n0).mapv(f64::log10);
 
-    (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab)
+    Ok((log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab))
 }
 
-/*******************************************************************/
+#[test]
+fn test_e_of_rho0() { // Should use scaled values here!!
+    let rho0 = 5e14;
+    let gamma_p = 1.03;
+    let result = 4.650_635_748_754_89E16;
+    assert_approx_eq!(e_of_rho0(rho0, gamma_p),result,1000.0);
+}
+
+
 fn e_of_rho0(rho0: f64, gamma_p: f64) -> f64 {
     rho0.powf(gamma_p)/(gamma_p-1.0)+rho0
+}
+
+#[test]
+fn test_e_at_p() {
+
+    {
+        let (log_e_tab, 
+        log_p_tab, _, _, _) = load_eos("./eos/eosA").unwrap(); 
+        // println!("{:?}",log_e_tab);
+        // println!("{:?}",log_p_tab);
+        let eostype = EosType::Table;
+        let e = e_at_p(10.0_f64.powf(0.8), Some(log_e_tab), Some(log_p_tab), eostype, None, Some(0)).unwrap();
+        assert_approx_eq!(e, 8.635_331_229_226_669);
+    }
+    {
+        let op_gamma_p = Some(2.025_538_636_879_4);
+        let eostype = EosType::Polytropic;
+        let e = e_at_p(10.0_f64.powf(0.8), None, None, eostype, op_gamma_p, None).unwrap();
+        assert_approx_eq!(e, 8.635_331_229_226_669, 0.000003);
+    }
+}
+
+
+fn  e_at_p( pp: f64, 
+    opt_log_e_tab: Option<Array1<f64>>, 
+    opt_log_p_tab: Option<Array1<f64>>,
+    eos_type: EosType,
+    op_gamma_p: Option<f64>,
+    opt_nearest: Option<usize>) -> Result<f64, String> {
+
+    match eos_type {
+        EosType::Table => {
+            if let Some(log_e_tab) = opt_log_e_tab { 
+                if let Some(log_p_tab) = opt_log_p_tab {
+                    return Ok(10.0_f64.powf(interp(&log_p_tab.to_vec(),&log_e_tab.to_vec(),pp.log10(),opt_nearest)));
+                };
+            };
+            Err("Using a tabulated EoS but failed to supply both log_e and log_p.".to_string())
+        },
+        EosType::Polytropic => {
+            if let Some(gamma_p) = op_gamma_p {
+                return Ok(pp/(gamma_p-1.0) + pp.powf(1.0/gamma_p));
+            };
+            Err("Using polytropic EoS but failed to supply gamma_p.".to_string())
+        },
+    }
 }

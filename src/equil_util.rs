@@ -1,6 +1,11 @@
 use std::cmp::{min,max};
 use assert_approx_eq::assert_approx_eq;
 
+pub enum EosType {
+    Table,
+    Polytropic,
+}
+
 #[test]
 fn test_hunt() {
     
@@ -18,7 +23,7 @@ fn test_hunt() {
         
         println!("ref_val={} , expected result_val={}, closest={}", ref_val, result_val, closest);
         println!("y_ref_val={} , expected y_result_val={}, y_closest={}", y_ref_val, y_result_val, y_closest);
-        let z = hunt(&y1, y_ref_val);
+        let z = hunt(&y1, y_ref_val, Some(3));
         println!("z={}",z);
         println!("{} == {}? = {}",result_val, z, result_val ==z );
         assert!((z as f64 - result_val as f64).abs() <= 1.0);
@@ -36,7 +41,7 @@ fn test_hunt() {
         
         println!("ref_val={} , expected result_val={}, closest={}", ref_val, result_val, closest);
         println!("y_ref_val={} , expected y_result_val={}, y_closest={}", y_ref_val, y_result_val, y_closest);
-        let z = hunt(&y1, y_ref_val);
+        let z = hunt(&y1, y_ref_val, None);
         println!("z={}",z);
         println!("{} == {}? = {}",result_val, z, result_val ==z );
         assert!((z as f64 - result_val as f64).abs() <= 1.0);
@@ -48,10 +53,14 @@ fn test_hunt() {
 /* Routine that locates nearest grid point for a given value.              */
 /* Adapted from Numerical Recipes.                                         */
 /***************************************************************************/
-fn hunt(xx: &[f64], x: f64) -> usize {
+fn hunt(xx: &[f64], x: f64, opt_jlo: Option<usize>) -> usize {
 
 	let n = xx.len();
-    let mut jlo = n >> 1;
+    let mut jlo = match opt_jlo {
+        Some(j) => j,
+        None => n >> 1,
+    };
+
     
     let mut jhi;
 	let ascnd = xx[n - 1] > xx[0];
@@ -126,11 +135,11 @@ fn test_interp() {
     let yp = &[0.1_f64, 0.1, 0.2, 0.25, 0.26, 2.65, 2.7];
 
     let xbvals = [0.3_f64, 1.5, 2.8];
-    let results = [0.0863625730994152_f64, 0.2400000000000000, 5.6252000000000000];
+    let results = [0.086_362_573_099_415_2_f64, 0.240_000_000_000_000_0, 5.625_200_000_000_000_0];
     // let kvals = [0_usize, 1, 3];
     
     for (idx, &xbval) in xbvals.iter().enumerate() {
-        let yb = interp(xp, yp, xbval);
+        let yb = interp(xp, yp, xbval, Some(6));
         assert_approx_eq!(yb, results[idx]);
     }
 }
@@ -141,11 +150,12 @@ fn test_interp() {
 /* This is a direct interpretation of polint from numerical recipes      */  
 /* Using equation 3.1.1.                                                 */  
 /*************************************************************************/
-fn interp(  xp: &[f64], 
+pub fn interp(  xp: &[f64], 
             yp: &[f64], 
-            xb: f64) -> f64 { 
+            xb: f64,
+            opt_nearest: Option<usize>) -> f64 { 
 
-    let nearest = hunt(xp,xb);
+    let nearest = hunt(xp,xb, opt_nearest);
 
     let np = xp.len();
     let k=max(0,
