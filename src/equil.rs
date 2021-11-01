@@ -236,34 +236,56 @@ fn p_at_e(ee: f64,
 } 
 
 // /*C*/
-// /*******************************************************************/
-// double p_at_h(double hh, 
-//     double log_p_tab[201], 
-//     double log_h_tab[201],
-//     int    n_tab, 
-//     int    *n_nearest_pt)
-// {
-// return pow(10.0,interp(log_h_tab,log_p_tab,n_tab,log10(hh), n_nearest_pt));
-// }
+#[test]
+fn test_p_at_h() {
+
+}
+
+
+fn  p_at_h(hh : f64, 
+    log_p_tab: Array1<f64>, 
+    log_h_tab: Array1<f64>,
+    opt_nearest: Option<usize>) -> f64 {
+
+    10.0_f64.powf(interp(&log_h_tab.to_vec(),
+                        &log_p_tab.to_vec(),
+                        hh.log10(),
+                        opt_nearest))
+}
 
 // /*C*/
-// /*******************************************************************/
-// double h_at_p(double pp, 
-//     double log_h_tab[201], 
-//     double log_p_tab[201],
-//     int    n_tab, 
-//     int    *n_nearest_pt)
-// {
-// return pow(10.0,interp(log_p_tab,log_h_tab,n_tab,log10(pp), n_nearest_pt));
-// }
+
+#[test]
+fn test_h_at_p() {
+
+}
+
+fn  h_at_p(pp : f64, 
+    log_h_tab: Array1<f64>, 
+    log_p_tab: Array1<f64>,
+    opt_nearest: Option<usize>) -> f64 {
+
+    10.0_f64.powf(interp(&log_p_tab.to_vec(),
+                        &log_h_tab.to_vec(),
+                        pp.log10(),
+                        opt_nearest))
+}
+
 
 // /*C*/
-// /*******************************************************************/
-// double n0_at_e(double ee, 
-//      double log_n0_tab[201], 
-//      double log_e_tab[201],
-//      int    n_tab, 
-//      int    *n_nearest_pt)
-// {
-// return pow(10.0,interp(log_e_tab,log_n0_tab,n_tab,log10(ee), n_nearest_pt));
-// }
+#[test]
+fn test_n0_at_e() {
+
+}
+
+fn  n0_at_e(ee : f64, 
+    log_n0_tab: Array1<f64>, 
+    log_e_tab: Array1<f64>,
+    opt_nearest: Option<usize>) -> f64 {
+
+    10.0_f64.powf(interp(&log_e_tab.to_vec(),
+                        &log_n0_tab.to_vec(),
+                        ee.log10(),
+                        opt_nearest))
+}
+
