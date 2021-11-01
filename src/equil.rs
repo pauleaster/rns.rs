@@ -191,7 +191,7 @@ fn  e_at_p( pp: f64,
     opt_log_p_tab: Option<Array1<f64>>,
     eos_type: EosType,
     op_gamma_p: Option<f64>,
-    opt_nearest: Option<usize>) -> Result<f64, String> {
+    opt_nearest: Option<usize>) -> Result<f64, Box<dyn Error>> {
 
     match eos_type {
         EosType::Table => {
@@ -200,13 +200,70 @@ fn  e_at_p( pp: f64,
                     return Ok(10.0_f64.powf(interp(&log_p_tab.to_vec(),&log_e_tab.to_vec(),pp.log10(),opt_nearest)));
                 };
             };
-            Err("Using a tabulated EoS but failed to supply both log_e and log_p.".to_string())
+            Err("Using a tabulated EoS but failed to supply both log_e and log_p.".into())
         },
         EosType::Polytropic => {
             if let Some(gamma_p) = op_gamma_p {
                 return Ok(pp/(gamma_p-1.0) + pp.powf(1.0/gamma_p));
             };
-            Err("Using polytropic EoS but failed to supply gamma_p.".to_string())
+            Err("Using polytropic EoS but failed to supply gamma_p.".into())
         },
     }
 }
+
+#[test]
+fn test_p_at_e() {
+    let (log_e_tab, 
+    log_p_tab, _, _, _) = load_eos("./eos/eosA").unwrap(); 
+    
+    let e = 8.635_331_229_226_669;
+    let pres = 10.0_f64.powf(0.8);
+    let p = p_at_e(e, log_e_tab, log_p_tab, Some(44));
+    assert_approx_eq!(p, pres,0.002);
+    /* Note, because of the interpolation, the inverse for p(e) is different than e(p) by
+        delta_p \sim 0.0012 */
+}
+
+fn p_at_e(ee: f64, 
+    log_e_tab: Array1<f64>, 
+    log_p_tab: Array1<f64>,
+    opt_nearest: Option<usize>) -> f64 {
+
+    10.0_f64.powf(interp(&log_e_tab.to_vec(),
+                        &log_p_tab.to_vec(),
+                        ee.log10(),
+                        opt_nearest))
+} 
+
+// /*C*/
+// /*******************************************************************/
+// double p_at_h(double hh, 
+//     double log_p_tab[201], 
+//     double log_h_tab[201],
+//     int    n_tab, 
+//     int    *n_nearest_pt)
+// {
+// return pow(10.0,interp(log_h_tab,log_p_tab,n_tab,log10(hh), n_nearest_pt));
+// }
+
+// /*C*/
+// /*******************************************************************/
+// double h_at_p(double pp, 
+//     double log_h_tab[201], 
+//     double log_p_tab[201],
+//     int    n_tab, 
+//     int    *n_nearest_pt)
+// {
+// return pow(10.0,interp(log_p_tab,log_h_tab,n_tab,log10(pp), n_nearest_pt));
+// }
+
+// /*C*/
+// /*******************************************************************/
+// double n0_at_e(double ee, 
+//      double log_n0_tab[201], 
+//      double log_e_tab[201],
+//      int    n_tab, 
+//      int    *n_nearest_pt)
+// {
+// return pow(10.0,interp(log_e_tab,log_n0_tab,n_tab,log10(ee), n_nearest_pt));
+// }
