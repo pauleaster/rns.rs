@@ -186,7 +186,7 @@ pub fn interp(  xp: &[f64],
 #[test]
 fn test_rtsec_g() {
     let e_center = 61.1558;
-    let gamma = 2.2639; // gamma estimate at the center
+    let gamma = 2.2639; 
     let rho_center = 6.4936;
     let rho0_center_est = rtsec_g( &e_of_rho0, gamma, 0.0,e_center,f64::EPSILON, 
         e_center ).unwrap();

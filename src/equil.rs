@@ -54,17 +54,17 @@ fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Array1<f64>,Arra
 fn test_read_eos_file () {
 
     // Ordering of the columns vectors:  rho, p, h, n0
-    let (rho, p, h, n0, n_tab) = read_eos_file("./eos/eosA").unwrap();
+    let (e, p, h, n0, n_tab) = read_eos_file("./eos/eosA").unwrap();
     assert_eq!(n_tab, 102);
     // First row:
     // 3.95008e+01 1.27820e+14 1.000000000000000e+00 2.379569102499467e+25 
-    assert_approx_eq!(rho[0], 3.95008e+01);
+    assert_approx_eq!(e[0], 3.95008e+01);
     assert_approx_eq!(p[0], 1.27820e+14);
     assert_approx_eq!(h[0], 1.000000000000000e+00);
     assert_approx_eq!(n0[0], 2.379569102499467e+25 );
     // Last row:
     // 6.11558e+16 6.20899e+37 2.096550609129587e+21 7.612604874394090e+39 
-    assert_approx_eq!(rho[n_tab-1], 6.11558e+16);
+    assert_approx_eq!(e[n_tab-1], 6.11558e+16);
     assert_approx_eq!(p[n_tab-1], 6.20899e+37);
     assert_approx_eq!(h[n_tab-1], 2.096550609129587e+21);
     assert_approx_eq!(n0[n_tab-1], 7.612604874394090e+39 );
@@ -73,7 +73,7 @@ fn test_read_eos_file () {
 pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
 
     // Ordering of the columns vectors:  rho, p, h, n0
-    let mut rho : Vec<f64> = vec![];
+    let mut e : Vec<f64> = vec![];
     let mut p : Vec<f64> = vec![];
     let mut h : Vec<f64> = vec![];
     let mut n0 : Vec<f64> = vec![];
@@ -106,7 +106,7 @@ pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, 
                     if let Ok(val) = val_parse {
                         // Ordering of the columns vectors:  rho, p, h, n0
                         match idx {
-                            0 => rho.push(val),
+                            0 => e.push(val),
                             1 => p.push(val),
                             2 => h.push(val),
                             3 => n0.push(val),
@@ -120,7 +120,7 @@ pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, 
         }
     }
 // Ordering of the columns vectors:  rho, p, h, n0
-    Ok((rho, p, h, n0, n_tab))
+    Ok((e, p, h, n0, n_tab))
 }
 
 
@@ -142,9 +142,9 @@ fn test_load_eos () {
 }
 pub fn load_eos(filename: &str, ) -> Result<(Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize), Box<dyn Error>> {
     
-    let (rho, p, h, n0, n_tab) = read_eos_file(filename)?; 
+    let (e, p, h, n0, n_tab) = read_eos_file(filename)?; 
 
-    let log_e_tab = (Array1::from_vec(rho) * (CC * CC * KSCALE)).mapv(f64::log10);
+    let log_e_tab = (Array1::from_vec(e) * (CC * CC * KSCALE)).mapv(f64::log10);
     let log_p_tab = (Array1::from_vec(p) * KSCALE).mapv(f64::log10);
     let log_h_tab = (Array1::from_vec(h) / (CC*CC)).mapv(f64::log10);
     let log_n0_tab = Array1::from_vec(n0).mapv(f64::log10);
@@ -308,7 +308,20 @@ fn test_make_center() {
         assert_approx_eq!(h_center, 2.332765405,0.0000001);
     }
     {
-        todo!(); // test make_center with polytropic EoS
+        let e_center = 61.1558;
+        let gamma = 2.2639; 
+        let rho0_center = 6.4936_f64;
+        let p_center = rho0_center.powf(gamma);
+        let h_center = (e_center+p_center)/rho0_center;
+        let (p_calc, h_calc) = make_center(None, 
+                                        None, 
+                                        None,
+                                        EosType::Polytropic, 
+                                        Some(gamma),
+                                        e_center).unwrap();
+        assert_approx_eq!(p_calc, p_center,0.003);
+        assert_approx_eq!(h_calc, h_center,0.0001);
+        
     }
 }
 
@@ -349,7 +362,7 @@ fn make_center(
                 let rho0_center = rtsec_g( &e_of_rho0, gamma_p, 0.0,e_center,f64::EPSILON, 
                                     e_center )?;
                 let p_center = rho0_center.powf(gamma_p);
-                return Ok((p_center, ((e_center+p_center)/rho0_center))); // log removed!!!!!
+                return Ok((p_center, (e_center+p_center)/rho0_center)); // log removed!!!!!
             };
             Err("gamma_p not supplied for EoS".into())
         },
