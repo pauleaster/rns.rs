@@ -3,6 +3,7 @@ use assert_approx_eq::assert_approx_eq;
 use std::error::Error;
 
 use crate::consts::*;
+use crate::equil::{e_at_p, e_of_rho0, load_eos, read_eos_file};
 
 
 pub enum EosType {
@@ -182,18 +183,41 @@ pub fn interp(  xp: &[f64],
     
 }
 
+#[test]
+fn test_rtsec_g() {
+    let e_center = 61.1558;
+    let gamma = 2.2639; // gamma estimate at the center
+    let rho_center = 6.4936;
+    let rho0_center_est = rtsec_g( &e_of_rho0, gamma, 0.0,e_center,f64::EPSILON, 
+        e_center ).unwrap();
+    println!("rho_center = {}, rho0_center_est = {}", rho_center, rho0_center_est);
+    assert_approx_eq!(rho_center, rho0_center_est, 0.0001);
+}
+
+#[test]
+#[should_panic]
+fn test_rtsec_g_fail() {
+    let e_center = 12.0;
+    let gamma = 2.2639; // gamma estimate at the center
+    let rho_center = 6.4936;
+    let rho0_center_est = rtsec_g( &e_of_rho0, gamma, 0.0,e_center,f64::EPSILON, 
+        e_center ).unwrap();
+    println!("rho_center = {}, rho0_center_est = {}", rho_center, rho0_center_est);
+    assert_approx_eq!(rho_center, rho0_center_est, 0.0001);
+}
+
 pub fn rtsec_g( func: &dyn Fn(f64, f64)-> f64, 
             gamma_p:  f64, 
-            mut x1: f64, 
-            mut x2: f64, 
+            x1: f64, 
+            x2: f64, 
             xacc: f64, 
             ee: f64) -> Result<f64,Box<dyn Error>> {
 
-//  double fl,f,dx,swap, xl,rts;
-    let mut rts:f64;
+
+let mut rts:f64;
     let mut x_l:f64;
     let swap:f64;
- 
+
     let mut f_l = func(x1,gamma_p)-ee;
     let mut f = func(x2,gamma_p)-ee;
 
@@ -208,8 +232,7 @@ pub fn rtsec_g( func: &dyn Fn(f64, f64)-> f64,
         rts=x2;
     }
 
- 
- for _j in 0..MAXIT {
+    for _j in 0..MAXIT {
     let dx=(x_l-rts)*f/(f-f_l);
     x_l=rts;
     f_l=f;
@@ -219,8 +242,8 @@ pub fn rtsec_g( func: &dyn Fn(f64, f64)-> f64,
     if dx.abs()<xacc || f==0.0 {
         return Ok(rts);
     }
-  }
- 
- Err("Maximum number of iterations exceeded in rtsec".into())  
- 
+    }
+
+    Err("Maximum number of iterations exceeded in rtsec".into())  
+
 }

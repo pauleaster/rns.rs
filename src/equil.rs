@@ -70,7 +70,7 @@ fn test_read_eos_file () {
     assert_approx_eq!(n0[n_tab-1], 7.612604874394090e+39 );
 }
 
-fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
+pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
 
     // Ordering of the columns vectors:  rho, p, h, n0
     let mut rho : Vec<f64> = vec![];
@@ -140,7 +140,7 @@ fn test_load_eos () {
     assert_approx_eq!(log_n0_tab[n_tab-1],  3.988_153_328_870_259e1);
     
 }
-fn load_eos(filename: &str, ) -> Result<(Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize), Box<dyn Error>> {
+pub fn load_eos(filename: &str, ) -> Result<(Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize), Box<dyn Error>> {
     
     let (rho, p, h, n0, n_tab) = read_eos_file(filename)?; 
 
@@ -161,7 +161,7 @@ fn test_e_of_rho0() { // Should use scaled values here!!
 }
 
 
-fn e_of_rho0(rho0: f64, gamma_p: f64) -> f64 {
+pub fn e_of_rho0(rho0: f64, gamma_p: f64) -> f64 {
     rho0.powf(gamma_p)/(gamma_p-1.0)+rho0
 }
 
@@ -183,10 +183,11 @@ fn test_e_at_p() {
         let e = e_at_p(10.0_f64.powf(0.8), None, None, eostype, op_gamma_p, None).unwrap();
         assert_approx_eq!(e, 8.635_331_229_226_669, 0.000003);
     }
+
 }
 
 
-fn  e_at_p( pp: f64, 
+pub fn  e_at_p( pp: f64, 
     opt_log_e_tab: Option<Array1<f64>>, 
     opt_log_p_tab: Option<Array1<f64>>,
     eos_type: EosType,
@@ -289,6 +290,28 @@ fn  n0_at_e(ee : f64,
                         opt_nearest))
 }
 
+#[test]
+fn test_make_center() {
+    {
+        let e_center = 78.8906; //61.1558;
+        let (log_e_tab, 
+            log_p_tab, 
+            log_h_tab, _, _) = load_eos("./eos/eosA").unwrap();
+        let (p_center, h_center) = make_center(Some(log_e_tab), 
+                                            Some(log_p_tab), 
+                                            Some(log_h_tab), 
+                                            EosType::Table, 
+                                            None, 
+                                            e_center).unwrap();
+        println!("p_c = {}, h_c = {}", p_center, h_center);
+        assert_approx_eq!(p_center, 69.08546357,0.00001);
+        assert_approx_eq!(h_center, 2.332765405,0.0000001);
+    }
+    {
+        todo!(); // test make_center with polytropic EoS
+    }
+}
+
 
 fn make_center(
         opt_log_e_tab: Option<Array1<f64>>,
@@ -326,7 +349,7 @@ fn make_center(
                 let rho0_center = rtsec_g( &e_of_rho0, gamma_p, 0.0,e_center,f64::EPSILON, 
                                     e_center )?;
                 let p_center = rho0_center.powf(gamma_p);
-                return Ok((p_center, ((e_center+p_center)/rho0_center).ln()));
+                return Ok((p_center, ((e_center+p_center)/rho0_center))); // log removed!!!!!
             };
             Err("gamma_p not supplied for EoS".into())
         },
