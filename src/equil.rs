@@ -34,18 +34,19 @@ fn test_make_grid() {
 
 }
 
-fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Array1<f64>,Array1<f64>){
+pub fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Vec<f64>,Vec<f64>){
 
     let s_dim = match s_size {
-        Some(s) => s as f64,
-        None => SDIV as f64,
+        Some(s) => s,
+        None => SDIV,
     };
     let mu_dim = match mu_size {
-        Some(m) => m as f64,
-        None => MDIV as f64,
+        Some(m) => m ,
+        None => MDIV,
     };
-    let s_gp = Array1::range(0., s_dim, 1.0) * (SMAX / (s_dim - 1.0));
-    let mu = Array1::range(0., mu_dim, 1.0) / (mu_dim - 1.0);
+
+    let s_gp = (0..s_dim).map(|x| (x as f64) * (SMAX / (s_dim as f64- 1.0))).collect();
+    let mu = (0.. mu_dim).map(|x| (x as f64) / (mu_dim as f64 - 1.0)).collect();
     (s_gp, mu)
 
 }
@@ -140,14 +141,14 @@ fn test_load_eos () {
     assert_approx_eq!(log_n0_tab[n_tab-1],  3.988_153_328_870_259e1);
     
 }
-pub fn load_eos(filename: &str, ) -> Result<(Array1<f64>, Array1<f64>, Array1<f64>, Array1<f64>, usize), Box<dyn Error>> {
+pub fn load_eos(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
     
     let (e, p, h, n0, n_tab) = read_eos_file(filename)?; 
 
-    let log_e_tab = (Array1::from_vec(e) * (CC * CC * KSCALE)).mapv(f64::log10);
-    let log_p_tab = (Array1::from_vec(p) * KSCALE).mapv(f64::log10);
-    let log_h_tab = (Array1::from_vec(h) / (CC*CC)).mapv(f64::log10);
-    let log_n0_tab = Array1::from_vec(n0).mapv(f64::log10);
+    let log_e_tab: Vec<f64> = e.iter().map(|x| (x * CC * CC * KSCALE).log10()).collect();
+    let log_p_tab: Vec<f64> = p.iter().map(|x| (x * KSCALE).log10()).collect();
+    let log_h_tab: Vec<f64> = h.iter().map(|x| (x / (CC*CC)).log10()).collect();
+    let log_n0_tab: Vec<f64> = n0.iter().map(|x| x.log10()).collect();
 
     Ok((log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab))
 }
@@ -178,9 +179,9 @@ fn test_e_at_p() {
         assert_approx_eq!(e, 8.635_331_229_226_669);
     }
     {
-        let op_gamma_p = Some(2.025_538_636_879_4);
+        let opt_gamma_p = Some(2.025_538_636_879_4);
         let eostype = EosType::Polytropic;
-        let e = e_at_p(10.0_f64.powf(0.8), None, None, eostype, op_gamma_p, None).unwrap();
+        let e = e_at_p(10.0_f64.powf(0.8), None, None, eostype, opt_gamma_p, None).unwrap();
         assert_approx_eq!(e, 8.635_331_229_226_669, 0.000003);
     }
 
@@ -188,23 +189,23 @@ fn test_e_at_p() {
 
 
 pub fn  e_at_p( pp: f64, 
-    opt_log_e_tab: Option<Array1<f64>>, 
-    opt_log_p_tab: Option<Array1<f64>>,
+    opt_log_e_tab: Option<Vec<f64>>, 
+    opt_log_p_tab: Option<Vec<f64>>,
     eos_type: EosType,
-    op_gamma_p: Option<f64>,
+    opt_gamma_p: Option<f64>,
     opt_nearest: Option<usize>) -> Result<f64, Box<dyn Error>> {
 
     match eos_type {
         EosType::Table => {
             if let Some(log_e_tab) = opt_log_e_tab { 
                 if let Some(log_p_tab) = opt_log_p_tab {
-                    return Ok(10.0_f64.powf(interp(&log_p_tab.to_vec(),&log_e_tab.to_vec(),pp.log10(),opt_nearest)));
+                    return Ok(10.0_f64.powf(interp(&log_p_tab,&log_e_tab,pp.log10(),opt_nearest)));
                 };
             };
             Err("Using a tabulated EoS but failed to supply both log_e and log_p.".into())
         },
         EosType::Polytropic => {
-            if let Some(gamma_p) = op_gamma_p {
+            if let Some(gamma_p) = opt_gamma_p {
                 return Ok(pp/(gamma_p-1.0) + pp.powf(1.0/gamma_p));
             };
             Err("Using polytropic EoS but failed to supply gamma_p.".into())
@@ -226,12 +227,12 @@ fn test_p_at_e() {
 }
 
 fn p_at_e(ee: f64, 
-    log_e_tab: Array1<f64>, 
-    log_p_tab: Array1<f64>,
+    log_e_tab: Vec<f64>, 
+    log_p_tab: Vec<f64>,
     opt_nearest: Option<usize>) -> f64 {
 
-    10.0_f64.powf(interp(&log_e_tab.to_vec(),
-                        &log_p_tab.to_vec(),
+    10.0_f64.powf(interp(&log_e_tab,
+                        &log_p_tab,
                         ee.log10(),
                         opt_nearest))
 } 
@@ -244,8 +245,8 @@ fn test_p_at_h() {
 
 
 fn  p_at_h(hh : f64, 
-    log_p_tab: Array1<f64>, 
-    log_h_tab: Array1<f64>,
+    log_p_tab: Vec<f64>, 
+    log_h_tab: Vec<f64>,
     opt_nearest: Option<usize>) -> f64 {
 
     10.0_f64.powf(interp(&log_h_tab.to_vec(),
@@ -262,12 +263,12 @@ fn test_h_at_p() {
 }
 
 fn  h_at_p(pp : f64, 
-    log_h_tab: Array1<f64>, 
-    log_p_tab: Array1<f64>,
+    log_h_tab: Vec<f64>, 
+    log_p_tab: Vec<f64>,
     opt_nearest: Option<usize>) -> f64 {
 
-    10.0_f64.powf(interp(&log_p_tab.to_vec(),
-                        &log_h_tab.to_vec(),
+    10.0_f64.powf(interp(&log_p_tab,
+                        &log_h_tab,
                         pp.log10(),
                         opt_nearest))
 }
@@ -280,12 +281,12 @@ fn test_n0_at_e() {
 }
 
 fn  n0_at_e(ee : f64, 
-    log_n0_tab: Array1<f64>, 
-    log_e_tab: Array1<f64>,
+    log_n0_tab: Vec<f64>, 
+    log_e_tab: Vec<f64>,
     opt_nearest: Option<usize>) -> f64 {
 
-    10.0_f64.powf(interp(&log_e_tab.to_vec(),
-                        &log_n0_tab.to_vec(),
+    10.0_f64.powf(interp(&log_e_tab,
+                        &log_n0_tab,
                         ee.log10(),
                         opt_nearest))
 }
@@ -327,9 +328,9 @@ fn test_make_center() {
 
 
 fn make_center(
-        opt_log_e_tab: Option<Array1<f64>>,
-        opt_log_p_tab: Option<Array1<f64>>,
-        opt_log_h_tab: Option<Array1<f64>>,        
+        opt_log_e_tab: Option<Vec<f64>>,
+        opt_log_p_tab: Option<Vec<f64>>,
+        opt_log_h_tab: Option<Vec<f64>>,        
         eos_type: EosType,
         opt_gamma_p: Option<f64>, 
         e_center: f64) -> Result<(f64, f64),Box<dyn Error>> {
