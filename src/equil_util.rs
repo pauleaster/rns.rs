@@ -146,7 +146,7 @@ fn test_interp() {
     // let kvals = [0_usize, 1, 3];
     
     for (idx, &xbval) in xbvals.iter().enumerate() {
-        let yb = interp(xp, yp, xbval, Some(6));
+        let (yb, idx) = interp(xp, yp, xbval, Some(6));
         assert_approx_eq!(yb, results[idx]);
     }
 }
@@ -160,7 +160,7 @@ fn test_interp() {
 pub fn interp(  xp: &[f64], 
             yp: &[f64], 
             xb: f64,
-            opt_nearest: Option<usize>) -> f64 { 
+            opt_nearest: Option<usize>) -> (f64, usize) { 
 
     let nearest = hunt(xp,xb, opt_nearest);
 
@@ -177,10 +177,10 @@ pub fn interp(  xp: &[f64],
     let d4 = round_from_zero((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
 
 
-    (xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d1
+    ((xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d1
         + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d2 
         + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d3
-        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4, nearest)
 
     
 }
@@ -317,6 +317,7 @@ fn test_dm_dr_is(){
     todo!();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn dm_dr_is(r_is: f64, 
             r: f64, 
             m: f64, 
@@ -327,22 +328,23 @@ fn dm_dr_is(r_is: f64,
             opt_log_p_tab: Option<Vec<f64>>, 
             opt_nearest: Option<usize>, 
             eos_type: EosType, 
-            opt_gamma_p: Option<f64>) -> f64 {
+            opt_gamma_p: Option<f64>) -> (f64, usize) {
 
-    let e_d  = if p<p_surface {
-        0.0_f64 
+
+    let (e_d, nearest)  = if p<p_surface {
+        (0.0_f64,0)
         } else {
             e_at_p(p, 
                     opt_log_e_tab, opt_log_p_tab, eos_type, opt_gamma_p, opt_nearest).unwrap()
                 };
     match r_is < RMIN {
-        true => 4.0 * PI * e_center * r * r * (1.0 + 4.0 * PI * e_center * r * r / 3.0),
-        false => 4.0 * PI * e_d * r * r * r * (1.0 - 2.0 * m / r).sqrt() / r_is,
+        true => (4.0 * PI * e_center * r * r * (1.0 + 4.0 * PI * e_center * r * r / 3.0), nearest),
+        false => (4.0 * PI * e_d * r * r * r * (1.0 - 2.0 * m / r).sqrt() / r_is, nearest),
     }
 }
 
 
-
+#[allow(clippy::too_many_arguments)]
 fn dp_dr_is(r_is: f64, 
     r: f64, 
     m: f64, 
@@ -353,57 +355,89 @@ fn dp_dr_is(r_is: f64,
     opt_log_p_tab: Option<Vec<f64>>, 
     opt_nearest: Option<usize>, 
     eos_type: EosType, 
-    opt_gamma_p: Option<f64>) -> f64 {
+    opt_gamma_p: Option<f64>) -> (f64, usize) {
 
-    let e_d  = if p<p_surface {
-    0.0_f64 
-    } else {
-        e_at_p(p, 
-                opt_log_e_tab, opt_log_p_tab, eos_type, opt_gamma_p, opt_nearest).unwrap()
-            };
-    match r_is < RMIN {
-        true => -4.0 * PI * (e_center + p) * (e_center + 3.0 * p) * r * (1.0 + 4.0 * e_center * r * r / 3.0) / 3.0,
-        false => -(e_d + p) * (m + 4.0 * PI * r * r * r * p) / (r * r_is * (1.0-2.0*m/r).sqrt()),
-    }
+    let (e_d, nearest)  = if p<p_surface {
+        (0.0_f64,0)
+        } else {
+            e_at_p(p, 
+                    opt_log_e_tab, opt_log_p_tab, eos_type, opt_gamma_p, opt_nearest).unwrap()
+                };
+        match r_is < RMIN {
+            true => (-4.0 * PI * (e_center + p) * (e_center + 3.0 * p) * r * (1.0 + 4.0 * e_center * r * r / 3.0) / 3.0, nearest),
+            false => (-(e_d + p) * (m + 4.0 * PI * r * r * r * p) / (r * r_is * (1.0-2.0*m/r).sqrt()), nearest),
+        }
 }
 
 
-#[test]
-fn test_tov() {
-    todo!();
-}
+// #[test]
+// fn test_tov() {
+//     todo!();
+// }
 
-fn tov(i_check:  usize, 
-        e_center: f64,
-        eos_type: EosType, 
-        opt_gamma_p: Option<f64>, 
-        mut r_is_final: f64,) {
+// #[allow(clippy::too_many_arguments)]
+// fn tov(i_check:  usize, 
+//         e_center: f64,
+//         p_center: f64,
+//         e_surface: f64,
+//         p_surface: f64,
+//         opt_log_e_tab: Option<Vec<f64>>,
+//         opt_log_p_tab: Option<Vec<f64>>,
+//         opt_log_h_tab: Option<Vec<f64>>,
+//         eos_type: EosType, 
+//         opt_gamma_p: Option<f64>, 
+//         r_is_gp : &mut [f64], 
+//         lambda_gp: &mut [f64], 
+//         nu_gp: &mut [f64],
+//         r_is_final: f64, 
+//         r_final: f64,
+//         m_final: f64) {
 
-    let r_is_est: f64;
-    let h: f64;
-    let dr_is_save: f64;
-    let r_is_save: f64;
-    let r_is_check: f64;
+//     let r_is_est: f64;
+//     let h: f64;
+//     let dr_is_save: f64;
+//     let r_is_save: f64;
+//     let r_is_check: f64;
+
+//     let mut r_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
+//     let mut m_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
+//     let mut e_d_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
 
     
-    if i_check == 1 {
-        r_is_est = match eos_type {
-            EosType::Table => 1.5e6 / KAPPA.sqrt(),
-            EosType::Polytropic => { 
-                let gamma_p = opt_gamma_p.unwrap();
-                2.0*(gamma_p/(4.0*PI*(gamma_p-1.0))).sqrt()*e_center.powf((gamma_p-2.0)/2.0)
-            },
-        };
-        h = r_is_est / 100.0;
-    } else {
-        r_is_est = r_is_final;
-        h = r_is_est / 10_000.0;
-        dr_is_save = r_is_final / (RDIV as f64);
-        r_is_check = dr_is_save;
-    }
+//     if i_check == 1 {
+//         r_is_est = match eos_type {
+//             EosType::Table => 1.5e6 / KAPPA.sqrt(),
+//             EosType::Polytropic => { 
+//                 let gamma_p = opt_gamma_p.unwrap();
+//                 2.0*(gamma_p/(4.0*PI*(gamma_p-1.0))).sqrt()*e_center.powf((gamma_p-2.0)/2.0)
+//             },
+//         };
+//         h = r_is_est / 100.0;
+//     } else {
+//         r_is_est = r_is_final;
+//         h = r_is_est / 10_000.0;
+//         dr_is_save = r_is_final / (RDIV as f64);
+//         r_is_check = dr_is_save;
+//     }
+//     let r_is=0.0;                            /* initial isotropic radius */
+//     let r=0.0;                               /* initial radius */
+//     let m=0.0;                               /* initial mass */ 
+//     let p=p_center;                          /* initial pressure */ 
 
+//     r_is_gp[0]=0.0;
+//     r_gp[0]=0.0;
+//     m_gp[0]=0.0;
+//     lambda_gp[0]=0.0;
+//     e_d_gp[0] = e_center; 
 
-}
+//     // Check out what nearest is doing here and whether it is passed to dm_dt_is ****************************
+//     while p>= p_surface {
+//         e_at_p
+//         e_d = e_at_p(p, opt_log_e_tab, opt_log_p_tab, eos_type, &n_nearest, eos_type, 
+//             Gamma_P);
+//     }
+
+// }
 
 
 
