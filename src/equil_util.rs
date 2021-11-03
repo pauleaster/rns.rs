@@ -1,5 +1,6 @@
 use std::cmp::{min,max};
 use assert_approx_eq::assert_approx_eq;
+use ndarray::{Array2, array};
 use std::error::Error;
 
 use crate::consts::*;
@@ -245,5 +246,25 @@ let mut rts:f64;
     }
 
     Err("Maximum number of iterations exceeded in rtsec".into())  
+}
 
+fn deriv_s(f: Array2<f64>, s: usize, m: usize) ->  f64 {
+
+    match s {
+        0 => (f[[s+1,m]]-f[[s,m]])/DS, // edge case
+        1 ..= SDIV_MIN_2 => (f[[s+1,m]]-f[[s-1,m]])/(2.0*DS), // normal case
+        SDIV_MIN_1  => (f[[s,m]]-f[[s-1,m]])/DS, // edge case        
+        _ => panic!("Attempted to take derivative with index out of bounds in deriv_s."),
+    }
+}
+
+fn deriv_ss(f: Array2<f64>, s: usize, m: usize) ->  f64 {
+
+    let s = match s {
+        0 ..= 2 => 4, // edge cases
+        5 ..= SDIV_MIN_3 => s,
+        SDIV_MIN_2 ..= SDIV_MIN_1 => SDIV_MIN_3, // normal case
+        _ => panic!("Attempted to take derivative with index out of bounds in deriv_s."),
+    };
+    (f[[s+2,m]]-2.0*f[[s,m]]+f[[s-2,m]])/(4.0*DSSQ)
 }
