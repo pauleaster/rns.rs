@@ -373,8 +373,36 @@ fn test_tov() {
     todo!();
 }
 
-fn tov() {
-    todo!();
+fn tov(i_check:  usize, 
+        e_center: f64,
+        eos_type: EosType, 
+        opt_gamma_p: Option<f64>, 
+        mut r_is_final: f64,) {
+
+    let r_is_est: f64;
+    let h: f64;
+    let dr_is_save: f64;
+    let r_is_save: f64;
+    let r_is_check: f64;
+
+    
+    if i_check == 1 {
+        r_is_est = match eos_type {
+            EosType::Table => 1.5e6 / KAPPA.sqrt(),
+            EosType::Polytropic => { 
+                let gamma_p = opt_gamma_p.unwrap();
+                2.0*(gamma_p/(4.0*PI*(gamma_p-1.0))).sqrt()*e_center.powf((gamma_p-2.0)/2.0)
+            },
+        };
+        h = r_is_est / 100.0;
+    } else {
+        r_is_est = r_is_final;
+        h = r_is_est / 10_000.0;
+        dr_is_save = r_is_final / (RDIV as f64);
+        r_is_check = dr_is_save;
+    }
+
+
 }
 
 

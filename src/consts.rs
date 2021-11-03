@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
 
+pub const RDIV: usize = 900;
 pub const SDIV : usize = 129;
 pub const SDIV_MIN_1 : usize = SDIV - 1; // for limitations in match
 pub const SDIV_MIN_2 : usize = SDIV - 2; // for limitations in match
