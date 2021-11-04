@@ -576,37 +576,24 @@ fn tov(i_check:  ICheck,
 
 // }
 #[allow(clippy::too_many_arguments)]
-fn sphere(
-    opt_log_e_tab: &Option<Vec<f64>>,
-    opt_log_p_tab: &Option<Vec<f64>>,
-    opt_log_h_tab: &Option<Vec<f64>>,
-    eos_type: &EosType, 
-    opt_gamma_p: Option<f64>, 
-    e_center: f64,
-    p_center: f64, 
-    // double h_center,
-    p_surface: f64,
-    e_surface: f64,
-    // double **rho,
-    // double **gama,
-    // double **alpha,
-    // double **omega,
-    // double *r_e
-) {
-    // int s,
-    //  m,
-    //  n_nearest;
-
-    // double r_is_s,
-    //     r_is_final,
-    //     r_final, 
-    //     m_final,
-    //     lambda_s,
-    //     nu_s,
-
-    //     gama_eq,
-    //     rho_eq,
-    //     s_e=0.5;
+fn sphere(s_gp: &mut[f64;SDIV],
+            opt_log_e_tab: &Option<Vec<f64>>,
+            opt_log_p_tab: &Option<Vec<f64>>,
+            opt_log_h_tab: &Option<Vec<f64>>,
+            eos_type: &EosType, 
+            opt_gamma_p: Option<f64>, 
+            e_center: f64,
+            p_center: f64, 
+            // double h_center,
+            p_surface: f64,
+            e_surface: f64,
+            rho: &mut Array2<f64>,
+            gama: &mut Array2<f64>,
+            alpha: &mut Array2<f64>,
+            omega: &mut Array2<f64>,
+            r_e: &mut f64) {
+ 
+    let s_e = 0.5;
 
     let r_is_final = &mut 0.0;
     let r_final = &mut 0.0;
@@ -636,39 +623,43 @@ fn sphere(
 
 
 
-    n_nearest=RDIV/2;
-    for(s=1;s<=SDIV;s++) {
-        r_is_s=r_is_final*(s_gp[s]/(1.0-s_gp[s]));
+    let nearest= RDIV >> 1;
+    for s in 0..SDIV  {
+        let r_is_s=*r_is_final*(s_gp[s]/(1.0-s_gp[s]));
 
-        if(r_is_s<r_is_final) {
-        lambda_s=interp(r_is_gp,lambda_gp,RDIV,r_is_s,&n_nearest);
-        nu_s=interp(r_is_gp,nu_gp,RDIV,r_is_s,&n_nearest);
+        let (nu_s, lambda_s) = if r_is_s < *r_is_final {
+            let (lambda_s, nearest)=interp(r_is_gp,lambda_gp,r_is_s,Some(nearest));
+            let opt_nearest = Some(nearest);
+            let (nu_s, _)=interp(r_is_gp,nu_gp,r_is_s, opt_nearest);
+            (nu_s, lambda_s)
+            }
+            else {
+                let lambda_s = 2.0 * (1.0 + *m_final / (2.0 * r_is_s )).ln();
+                let nu_s=((1.0 - *m_final / (2.0 * r_is_s) )/(1.0 + *m_final/(2.0 * r_is_s))).ln();
+                (nu_s, lambda_s)
+            };
+
+        gama[[s,0]]=nu_s+lambda_s;
+        rho[[s,1]]=nu_s-lambda_s;
+
+        for m in 0.. MDIV {
+            gama[[s,m]]=gama[[s,1]];        
+            rho[[s,m]]=rho[[s,1]];
+            alpha[[s,m]]=(gama[[s,1]]-rho[[s,1]])/2.0;
+            omega[[s,m]]=0.0; 
         }
-        else {
-        lambda_s=2.0*log(1.0+m_final/(2.0*r_is_s));
-        nu_s=log((1.0-m_final/(2.0*r_is_s))/(1.0+m_final/(2*r_is_s)));
-        }
 
-        gama[s][1]=nu_s+lambda_s;
-        rho[s][1]=nu_s-lambda_s;
-
-        for(m=1;m<=MDIV;m++) {
-            gama[s][m]=gama[s][1];        
-            rho[s][m]=rho[s][1];
-            alpha[s][m]=(gama[s][1]-rho[s][1])/2.0;
-            omega[s][m]=0.0; 
-        }
-
-        gama_mu_0[s]=gama[s][1];                   /* gama at \mu=0 */
-        rho_mu_0[s]=rho[s][1];                     /* rho at \mu=0 */
+        gama_mu_0[s]=gama[[s,0]];                   /* gama at \mu=0 */
+        rho_mu_0[s]=rho[[s,0]];                     /* rho at \mu=0 */
 
     }
 
-    n_nearest=SDIV/2;
-    gama_eq = interp(s_gp,gama_mu_0,SDIV,s_e,&n_nearest); /* gama at equator */
-    rho_eq = interp(s_gp,rho_mu_0,SDIV,s_e,&n_nearest);   /* rho at equator */
+    let opt_nearest = Some(SDIV>>1);
+    let (gama_eq, nearest) = interp(s_gp,gama_mu_0,s_e,opt_nearest); /* gama at equator */
+    let opt_nearest = Some(nearest);
+    let (rho_eq, _) = interp(s_gp,rho_mu_0,s_e, opt_nearest);   /* rho at equator */
 
-    (*r_e)= r_final*exp(0.5*(rho_eq-gama_eq)); 
+    (*r_e)= *r_final * (0.5*(rho_eq-gama_eq)).exp(); 
 
 }
 
