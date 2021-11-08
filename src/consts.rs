@@ -22,3 +22,4 @@ pub const KSCALE: f64 = KAPPA*GG/(CC*CC*CC*CC);   /* another scaling factor */
 pub const MSUN: f64 = 1.987e33;       /* Mass of Sun */
 pub const MAXIT: usize = 100;
 pub const RMIN: f64 = 1e-15;
+pub const LMAX: usize = 10;               /* max. term in Legendre poly. */
