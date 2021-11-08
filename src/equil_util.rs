@@ -1,7 +1,7 @@
 use std::cmp::{min,max};
 use std::convert::TryInto;
 use std::f64::consts::PI;
-use approx::relative_eq;
+use approx::{relative_eq, relative_ne};
 use assert_approx_eq::assert_approx_eq;
 use ndarray::{Array2, Array3, Zip, array, prelude::*};
 use std::error::Error;
@@ -667,11 +667,88 @@ fn sphere(s_gp: &mut[f64;SDIV],
 
 }
 
+/*******************************************************************/
+/* Returns the Legendre polynomial of degree n, evaluated at x.    */
+/*******************************************************************/
+fn legendre( n: usize, x: f64 ) -> f64 {
+
+
+
+    // p Legendre polynomial of order n 
+    // p_1   "      "      "    "   n-1
+    // p_2   "      "      "    "   n-2 
+
+    let mut p = 0.0;
+    let mut p_2=1.0;
+    let mut p_1=x;
+
+    if n >= 2  { 
+        for i in 2 ..= n { // for (i=2;i<=n;i++){
+            p = (x*(2.0 * (i as f64) - 1.0) * p_1 - ((i as f64) - 1.0) * p_2) / (i as f64);
+            p_2 = p_1;
+            p_1 = p;
+        }
+        return p;
+    } else if  n==1 {
+        return p_1;
+    } else {
+        return p_2;
+    }
+}
+
+/*******************************************************************/
+/* Returns the associated Legendre polynomial P_l^m(x).            */
+/* Adapted from numerical recipes.                                 */
+/*******************************************************************/
+fn plgndr(l: i32, m: i32, x: f64) -> f64 {
+	// double fact,pll,pmm,pmmp1,somx2;
+	// int i,ll;
+
+    let mut pll = 0.0;
+    let mut pmmp1;
+    let mut fact;
+
+	if  x.abs() > 1.0 {
+		panic!("|x| must be <= 1.0 in LegendrePoly (plgndr), x={}",x);
+    }
+    if m < 0 {
+        panic!("Negative m value passed to LegendrePoly (plgndr), m={}",m);
+    }
+	let mut pmm=1.0;
+
+    let somx2=((1.0-x)*(1.0+x)).sqrt();
+    fact=1.0;
+    for _ in 1 ..= m { //(i=1;i<=m;i++) {
+        pmm *= -fact*somx2;
+        fact += 2.0;
+    }
+
+    match l-m {
+        i32::MIN..=-1 => panic!("Should never execute"),
+        0 => pmm,
+        1 =>  x * (2.0 * m as f64 + 1.0 ) * pmm,
+        2 .. => {
+            pmmp1=x * (2.0 * m as f64 + 1.0 ) * pmm;
+            for ll in m+2 ..= l { //(ll=(m+2);ll<=l;ll++) {
+				pll=(x * (2.0 * ll as f64 - 1.0) * pmmp1 - ((ll+m-1) as f64) * pmm) / ((ll-m) as f64);
+				pmm=pmmp1;
+				pmmp1=pll;
+			}
+			pll
+        },
+    }
+
+}
+
+
 #[test]
 fn test_spin() {
     let (s,m) = make_grid(None,None);
     println!("s.len() = {}, m.len={}", s.len(), m.len());
+    let now = Instant::now();
     spin(&s, &m);
+    let elapsed = now.elapsed().as_secs_f64();
+    println!("Elapsed time = {}",elapsed);
 
 
 }
@@ -800,43 +877,41 @@ fn spin(
 //        sj1,
 //        r_e;
 
-   
+    
+
+    
+    let f_rho = &mut Array3::<f64>::zeros((SDIV, LMAX + 1, SDIV)); //f3tensor(1,SDIV,1,LMAX+1,1,SDIV);
+    let f_gama = &mut Array3::<f64>::zeros((SDIV, LMAX + 1, SDIV)); //f3tensor(1,SDIV,1,LMAX+1,1,SDIV);
+
+    let p_2n = &mut Array2::<f64>::zeros((MDIV,LMAX + 1));   // dmatrix(1,MDIV,1,LMAX+1); 
+    let p1_2n_1 = &mut Array2::<f64>::zeros((MDIV,LMAX + 1)); //dmatrix(1,MDIV,1,LMAX+1); 
+
+    { // scope to allow the freeing of f2n
         let f2n = &mut Array2::<f64>::zeros((LMAX + 1, SDIV)); //dmatrix(1,LMAX+1,1,SDIV);
-        let f_rho = &mut Array3::<f64>::zeros((SDIV, LMAX + 1, SDIV)); //f3tensor(1,SDIV,1,LMAX+1,1,SDIV);
-        let f_gama = &mut Array3::<f64>::zeros((SDIV, LMAX + 1, SDIV)); //f3tensor(1,SDIV,1,LMAX+1,1,SDIV);
-
-        // let p_2n = &mut Array2::<f64>::zeros((MDIV-1,LMAX));   
-        // let p1_2n_1 = &mut Array2::<f64>::zeros((MDIV-1,LMAX));
-
-
         for (n, mut row) in f2n.axis_iter_mut(Axis(0)).enumerate() {
             for (i, val) in row.iter_mut().enumerate() {
                 if i==0 {
                     continue;
                 }
-                *val =  ((1.0 - s_gp[i])/ s_gp[i]).powi(2*(n+ 1) as i32); // here: n+1 = 1..LMAX+1, C code: n+1: 1..LMAX+1
+                *val =  ((1.0 - s_gp[i])/ s_gp[i]).powi(2*(n+ 1) as i32); // here: n+1 = 1..=LMAX+1, C code: n+1: 1..=LMAX+1
             }
         }
 
+        // The published code has defined SMAX = 0.999, in this case the following code is always executed
+        // The code corresponding to SMAX = 1.0 has been removed. It can be reinstated at a later date if required once the rust code is working
+        // C code: if (SMAX != 1.0)  {  
 
-            
-
-
-    
-
-    if relative_eq!(SMAX,1.0)  {
-
-        for j in 1..SDIV { // (j=2;j<=SDIV;j++)  *** j reduced by 1, j=0 not parsed
-            for n in 0.. LMAX { //(n=1;n<=LMAX;n++)    ***** n reduced by 1
-                for k in 1 .. SDIV { //(k=2;k<=SDIV;k++) { ***** k reduced by 1, k=0 not parsed
+        for j in 1..= SDIV-1 { // (j=2;j<=SDIV;j++)  *** j reduced by 1, j=0 not parsed
+            for n in 0..= LMAX-1 { //(n=1;n<=LMAX;n++)    ***** n reduced by 1
+                for k in 1 ..= SDIV-1 { //(k=2;k<=SDIV;k++) { ***** k reduced by 1, k=0 not parsed
                     let sk=s_gp[k];
                     let sj=s_gp[j];
                     let sk1=1.0-sk;
                     let sj1=1.0-sj;
 
                     if k<j  {   
-                        f_rho[[j,n+1,k]] = f2n[[n+1,j]]*sj1/(sj*f2n[[n+1,k]]*sk1*sk1); // here: n+1 index = 1..LMAX, C code: n+1 = 2..LMAX+1
-                        f_gama[[j,n+1,k]] = f2n[[n+1,j]]/(f2n[[n+1,k]]*sk*sk1); // here: j,k index = 1..SDIV-1, C code: j,k = 2..SDIV
+                        f_rho[[j,n+1,k]] = f2n[[n+1,j]]*sj1/(sj*f2n[[n+1,k]]*sk1*sk1); // here: n+1 index = 1..=LMAX, C code: n+1 = 2..=LMAX+1
+                        f_gama[[j,n+1,k]] = f2n[[n+1,j]]/(f2n[[n+1,k]]*sk*sk1); // here: j,k index = 1..=SDIV-1, C code: j,k = 2..=SDIV
                     } else {     
                         f_rho[[j,n+1,k]] = f2n[[n+1,k]]/(f2n[[n+1,j]]*sk*sk1);
                         f_gama[[j,n+1,k]] = f2n[[n+1,k]]*sj1*sj1*sk/(sj*sj*f2n[[n+1,j]]*sk1*sk1*sk1);
@@ -844,156 +919,70 @@ fn spin(
                 } // for k
             } // for n
         } // for j
-        let j=0; // here: j=0, C code: j=1
 
-        let n=0; 
-        for k in 1..SDIV { //(k=2;k<=SDIV;k++) {
-            let sk=s_gp[k];
-            f_rho[[j,n+1,k]]=1.0/(sk*(1.0-sk));
+        for k in 1..= SDIV-1 { //(k=2;k<=SDIV;k++) {
+            let sk=s_gp[k]; // here: k index = 1..=SDIV-1, C code: k index = 2..=SDIV
+            f_rho[[0,0,k]]=1.0/(sk*(1.0-sk)); // here: f_rho[[0,0,k]], C code: f_rho[j=1][n+1=1][k]
         }
 
-        let n=1;
-        for k = 1..SDIV { //(k=2;k<=SDIV;k++) {
-            sk=s_gp[k];
-            sk1=1.0-sk;         
-            f_rho[j][n+1][k]=0.0;
-            f_gama[j][n+1][k]=1.0/(sk*sk1);
+
+        for k in 1..= SDIV-1 { //(k=2;k<=SDIV;k++) {
+            let sk=s_gp[k]; // here: k index = 1..=SDIV-1, C code: k index = 2..=SDIV
+            let sk1=1.0-sk;         
+            f_rho[[0,1,k]]=0.0;
+            f_gama[[0,1,k]]=1.0/(sk*sk1); // here: f_rho[[0,1,k]], f_gama[[0,1,k]], C code: f_rho[j = 1][n+1 = 2][k], f_gama[j][n+1][k]
         }
 
-        for n=1..LMAX { //(n=2;n<=LMAX;n++) {
-            for k = 0..SDIV { //(k=1;k<=SDIV;k++) {
-                f_rho[j][n+1][k]=0.0;
-                f_gama[j][n+1][k]=0.0;
+        for n in 1..= LMAX-1 { //(n=2;n<=LMAX;n++) {
+            for k in 0..= SDIV-1 { //(k=1;k<=SDIV;k++) {
+                f_rho[[0,n+1,k]]=0.0; // C code f_rho[j=1][n+1][k], f_gama[j=1][n+1][k]
+                f_gama[[0,n+1,k]]=0.0;
             } 
         }
 
+        for j in 0 ..= SDIV-1 { // for(j=1;j<=SDIV;j++)
+            f_rho[[j,0,0]]=0.0; // C code f_rho[j][n+1 = 1][k = 1]
+        }
 
-        let k=0;
-
-        let n=0;
-        for(j=1;j<=SDIV;j++)
-            f_rho[j][n+1][k]=0.0;
-
-        for(j=1;j<=SDIV;j++)
-        for(n=1;n<=LMAX;n++) {
-            f_rho[j][n+1][k]=0.0;
-            f_gama[j][n+1][k]=0.0;
+        for j in 0 ..= SDIV-1 { // for(j=1;j<=SDIV;j++)
+            for n in 0..= LMAX-1 {  // for(n=1;n<=LMAX;n++)
+                f_rho[[j,n+1,0]]=0.0; // C code: f_rho[j][n+1][k=1], f_gama[j][n+1][k=1]
+                f_gama[[j,n+1,0]]=0.0;
+            }
         }
 
 
-    n=0;
-    for(j=2;j<=SDIV;j++)
-        for(k=2;k<=SDIV;k++) {
-                sk=s_gp[k];
-                sj=s_gp[j];
-                sk1=1.0-sk;
-                sj1=1.0-sj;
+    for j in 1 ..= SDIV-1 { // for(j=2;j<=SDIV;j++)
+        for k in 1 ..= SDIV-1 { // for(k=2;k<=SDIV;k++)
+                let sk=s_gp[k];
+                let sj=s_gp[j];
+                let sk1=1.0-sk;
+                let sj1=1.0-sj;
 
-                if(k<j) 
-                f_rho[j][n+1][k] = sj1/(sj*sk1*sk1);
-                else     
-                f_rho[j][n+1][k] = 1.0/(sk*sk1);
+                if k<j {
+                    f_rho[[j,0,k]] = sj1/(sj*sk1*sk1); // C code f_rho[j][n+1 = 1][k]
+                }
+                else {
+                    f_rho[[j,0,k]] = 1.0/(sk*sk1);
+                }
+            }
+        }
+        // } C code if (SMAX != 1.0)
+
+
+        // Note that there is no shift in the index of n in the legendre() function, ie. it is unchanged from the C code.
+        for i in 0 ..= MDIV-1 {  //for(i=1;i<=MDIV;i++)
+            p_2n[[i,0]]=legendre(0,mu[i]); // p_2n[i][n+1]=legendre(2*n,mu[i]);
         }
 
-    } // SMAX != 1.0
+        for i in 0 ..= MDIV-1 { // for(i=1;i<=MDIV;i++)
+            for n in 0 ..= LMAX - 1 { // for(n=1;n<=LMAX;n++) {
+                p_2n[[i,n]]=legendre(2*n + 2,mu[i]); // 2(n+1) = 2n + 2
+                p1_2n_1[[i,n]] = plgndr((2*n +1) as i32 ,1,mu[i]); // 2(n+1) - 1 = 2n + 1
+            }
+        } 
+    } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
 
-
-//  else{      
-//       for(j=2;j<=SDIV-1;j++)
-//          for(n=1;n<=LMAX;n++)
-//             for(k=2;k<=SDIV-1;k++) {
-//                sk=s_gp[k];
-//                sj=s_gp[j];
-//                sk1=1.0-sk;
-//                sj1=1.0-sj;
-
-//                if(k<j) {   
-//                         f_rho[j][n+1][k] = f2n[n+1][j]*sj1/(sj*
-//                                          f2n[n+1][k]*sk1*sk1);
-//                         f_gama[j][n+1][k] = f2n[n+1][j]/(f2n[n+1][k]*sk*sk1);
-//                }else {     
-//                         f_rho[j][n+1][k] = f2n[n+1][k]/(f2n[n+1][j]*sk*sk1);
-
-//                         f_gama[j][n+1][k] = f2n[n+1][k]*sj1*sj1*sk/(sj*sj
-//                                           *f2n[n+1][j]*sk1*sk1*sk1);
-//                }
-//         }
- 
-//       j=1;
-
-//         n=0; 
-//         for(k=2;k<=SDIV-1;k++) {
-//            sk=s_gp[k];
-//            f_rho[j][n+1][k]=1.0/(sk*(1.0-sk));
-//         }
-
-//         n=1;
-//         for(k=2;k<=SDIV-1;k++) {
-//            sk=s_gp[k];
-//            sk1=1.0-sk;         
-//            f_rho[j][n+1][k]=0.0;
-//            f_gama[j][n+1][k]=1.0/(sk*sk1);
-//         }
-
-//         for(n=2;n<=LMAX;n++)
-//            for(k=1;k<=SDIV-1;k++) {
-//               f_rho[j][n+1][k]=0.0;
-//               f_gama[j][n+1][k]=0.0;
-//            }
-
-//       k=1;
-
-//         n=0;
-//         for(j=1;j<=SDIV-1;j++)
-//            f_rho[j][n+1][k]=0.0;
-
-//         for(j=1;j<=SDIV-1;j++)
-//            for(n=1;n<=LMAX;n++) {
-//               f_rho[j][n+1][k]=0.0;
-//               f_gama[j][n+1][k]=0.0;
-//            }
-
-
-//       n=0;
-//         for(j=2;j<=SDIV-1;j++)
-//            for(k=2;k<=SDIV-1;k++) {
-//               sk=s_gp[k];
-//               sj=s_gp[j];
-//               sk1=1.0-sk;
-//               sj1=1.0-sj;
-
-//               if(k<j) 
-//                 f_rho[j][n+1][k] = sj1/(sj*sk1*sk1);
-//               else     
-//                 f_rho[j][n+1][k] = 1.0/(sk*sk1);
-//            }
-
-//       j=SDIV;
-//         for(n=1;n<=LMAX;n++)
-//            for(k=1;k<=SDIV;k++) {
-//               f_rho[j][n+1][k] = 0.0;
-//               f_gama[j][n+1][k] = 0.0;
-//            }
-
-//       k=SDIV;
-//         for(j=1;j<=SDIV;j++)
-//             for(n=1;n<=LMAX;n++) {
-//                f_rho[j][n+1][k] = 0.0;
-//                f_gama[j][n+1][k] = 0.0;
-//             }
-//  }
-
-// n=0;
-//  for(i=1;i<=MDIV;i++)
-//     p_2n[i][n+1]=legendre(2*n,mu[i]);
-
-//  for(i=1;i<=MDIV;i++)
-//    for(n=1;n<=LMAX;n++) {
-//     p_2n[i][n+1]=legendre(2*n,mu[i]);
-//     p1_2n_1[i][n+1] = plgndr(2*n-1 ,1,mu[i]);
-//   }
-
-// free_dmatrix(f2n,1,LMAX+1,1,SDIV);
 
 
 // for(m=1;m<=MDIV;m++) { 
