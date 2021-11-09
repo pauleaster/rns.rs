@@ -246,7 +246,7 @@ fn test_p_at_h() {
 }
 
 
-fn  p_at_h(hh : f64, 
+pub fn  p_at_h(hh : f64, 
     log_p_tab: &Vec<f64>, 
     log_h_tab: &Vec<f64>,
     opt_nearest: Option<usize>) -> (f64, Option<usize>) {
