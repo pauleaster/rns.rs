@@ -1,7 +1,7 @@
 use std::cmp::{min,max};
 use std::convert::TryInto;
 use std::f64::consts::PI;
-use approx::{relative_eq, relative_ne};
+// use approx::{relative_eq, relative_ne};
 use assert_approx_eq::assert_approx_eq;
 use ndarray::{Array2, Array3, Zip, array, prelude::*};
 use std::error::Error;
@@ -150,7 +150,7 @@ fn test_interp() {
     // let kvals = [0_usize, 1, 3];
     
     for (idx, &xbval) in xbvals.iter().enumerate() {
-        let (yb, idx) = interp(xp, yp, xbval, Some(6));
+        let (yb, _) = interp(xp, yp, xbval, Some(6));
         assert_approx_eq!(yb, results[idx]);
     }
 }
@@ -175,16 +175,16 @@ pub fn interp(  xp: &[f64],
     // epsilon shift corrected, should eliminate (xp[i]-xp[j]).abs() < eps
 
 
-    let d1 = round_from_zero((xp[k]-xp[k+1])*(xp[k]-xp[k+2])*(xp[k]-xp[k+3]));
-    let d2 = round_from_zero((xp[k+1]-xp[k])*(xp[k+1]-xp[k+2])*(xp[k+1]-xp[k+3]));
-    let d3 = round_from_zero((xp[k+2]-xp[k])*(xp[k+2]-xp[k+1])*(xp[k+2]-xp[k+3]));
-    let d4 = round_from_zero((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
+    let d0 = round_from_zero((xp[k]-xp[k+1])*(xp[k]-xp[k+2])*(xp[k]-xp[k+3]));
+    let d1 = round_from_zero((xp[k+1]-xp[k])*(xp[k+1]-xp[k+2])*(xp[k+1]-xp[k+3]));
+    let d2 = round_from_zero((xp[k+2]-xp[k])*(xp[k+2]-xp[k+1])*(xp[k+2]-xp[k+3]));
+    let d3 = round_from_zero((xp[k+3]-xp[k])*(xp[k+3]-xp[k+1])*(xp[k+3]-xp[k+2]));
 
 
-    ((xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d1
-        + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d2 
-        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d3
-        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d4, nearest)
+    ((xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d0
+        + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d1 
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d2
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d3, nearest)
 
     
 }
@@ -316,10 +316,10 @@ fn dr_dr_is(r_is: f64, r: f64, m: f64) -> f64 {
     }
 }
 
-#[test]
-fn test_dm_dr_is(){
-    todo!();
-}
+// #[test]
+// fn test_dm_dr_is(){
+//     todo!();
+// }
 
 #[allow(clippy::too_many_arguments)]
 fn dm_dr_is(r_is: f64, 
@@ -374,10 +374,10 @@ fn dp_dr_is(r_is: f64,
 }
 
 
-#[test]
-fn test_tov() {
-    todo!();
-}
+// #[test]
+// fn test_tov() {
+//     todo!();
+// }
 
 // #[derive(PartialEq)]
 enum ICheck {
@@ -667,40 +667,67 @@ fn sphere(s_gp: &mut[f64;SDIV],
 
 }
 
+
+#[test]
+fn test_legendre() {
+    let x = [0.2, 0.5, 0.8];
+    let order = [2,6,9];
+    let expected_results = [-0.44, 0.32324, 0.18786];
+
+    for (i,&xval) in x.iter().enumerate(){
+        assert_approx_eq!(legendre(order[i], xval),expected_results[i], 0.00001);
+    }
+
+}
 /*******************************************************************/
 /* Returns the Legendre polynomial of degree n, evaluated at x.    */
 /*******************************************************************/
 fn legendre( n: usize, x: f64 ) -> f64 {
 
-
-
     // p Legendre polynomial of order n 
     // p_1   "      "      "    "   n-1
     // p_2   "      "      "    "   n-2 
 
-    let mut p = 0.0;
-    let mut p_2=1.0;
-    let mut p_1=x;
-
-    if n >= 2  { 
-        for i in 2 ..= n { // for (i=2;i<=n;i++){
-            p = (x*(2.0 * (i as f64) - 1.0) * p_1 - ((i as f64) - 1.0) * p_2) / (i as f64);
-            p_2 = p_1;
-            p_1 = p;
-        }
-        return p;
-    } else if  n==1 {
-        return p_1;
-    } else {
-        return p_2;
+    match n {
+        0 => 1.0,
+        1 => x,
+        2.. => {
+            let mut p = 0.0;
+            let mut p_2=1.0;
+            let mut p_1=x;
+            for i in 2..=n {
+                p = (x*(2.0 * (i as f64) - 1.0) * p_1 - ((i as f64) - 1.0) * p_2) / (i as f64);
+                p_2 = p_1;
+                p_1 = p;
+            }
+            p
+        },
+        _ => 0.0, // never executed
     }
+
+}
+
+
+#[test]
+fn test_legendre_lm() {
+    let lvals = [0, 1, 2, 3, 1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6, 4, 5, 6, 7, 5, 6, 7, 8];
+    let mvals = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5];
+    let results = [1.0, 0.5, -0.125, -0.4375, -0.8660254037844386, -1.299038105676658, 
+                            -0.3247595264191645, 1.3531646934131853, 2.25, 5.625, 4.21875, -4.921875, 
+                            -9.742785792574933, -34.099750274012266, -42.62468784251533, 12.787406352754601, 
+                            59.06249999999999, 265.78124999999994, 465.11718749999994, 121.81640625, 
+                            -460.3466286991656, -2531.906457845411, -5696.789530152175, -4114.347993998793];
+    for i in 0..lvals.len() {
+        assert_approx_eq!(legendre_poly_lm(lvals[i], mvals[i], 0.5), results[i]);
+    } 
+
 }
 
 /*******************************************************************/
 /* Returns the associated Legendre polynomial P_l^m(x).            */
 /* Adapted from numerical recipes.                                 */
 /*******************************************************************/
-fn plgndr(l: i32, m: i32, x: f64) -> f64 {
+fn legendre_poly_lm(l: i32, m: i32, x: f64) -> f64 { // renamed from plgndr()
 	// double fact,pll,pmm,pmmp1,somx2;
 	// int i,ll;
 
@@ -709,10 +736,10 @@ fn plgndr(l: i32, m: i32, x: f64) -> f64 {
     let mut fact;
 
 	if  x.abs() > 1.0 {
-		panic!("|x| must be <= 1.0 in LegendrePoly (plgndr), x={}",x);
+		panic!("|x| must be <= 1.0 in legendre_poly_lm (plgndr), x={}",x);
     }
     if m < 0 {
-        panic!("Negative m value passed to LegendrePoly (plgndr), m={}",m);
+        panic!("Negative m value passed to legendre_poly_lm Poly (plgndr), m={}",m);
     }
 	let mut pmm=1.0;
 
@@ -724,7 +751,7 @@ fn plgndr(l: i32, m: i32, x: f64) -> f64 {
     }
 
     match l-m {
-        i32::MIN..=-1 => panic!("Should never execute"),
+        i32::MIN..=-1 => panic!("m>l is invalid in Legendre_lm Poly (plgndr), m={} and l={}",m,l),
         0 => pmm,
         1 =>  x * (2.0 * m as f64 + 1.0 ) * pmm,
         2 .. => {
@@ -978,7 +1005,7 @@ fn spin(
         for i in 0 ..= MDIV-1 { // for(i=1;i<=MDIV;i++)
             for n in 0 ..= LMAX - 1 { // for(n=1;n<=LMAX;n++) {
                 p_2n[[i,n]]=legendre(2*n + 2,mu[i]); // 2(n+1) = 2n + 2
-                p1_2n_1[[i,n]] = plgndr((2*n +1) as i32 ,1,mu[i]); // 2(n+1) - 1 = 2n + 1
+                p1_2n_1[[i,n]] = legendre_poly_lm((2*n +1) as i32 ,1,mu[i]); // 2(n+1) - 1 = 2n + 1
             }
         } 
     } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
