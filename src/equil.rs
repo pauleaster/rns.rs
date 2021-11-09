@@ -14,40 +14,33 @@ use crate::consts::*;
 #[test]
 fn test_make_grid() {
     println!("Using default constants: SDIV={}, MDIV={}",SDIV,MDIV);
-    let (s,m) = make_grid(None,None);
+    let (s,m) = make_grid();
     println!("s[0]={:?}, s[{}]={:?}",s[0],SDIV,s[SDIV-1]);
     println!("m[0]={:?}, s[{}]={:?}",m[0],MDIV,m[MDIV-1]);
     assert_approx_eq!(s[0]-0.0,f64::EPSILON);
     assert_approx_eq!(s[SDIV-1],SMAX,f64::EPSILON);
     assert_approx_eq!(m[0],0.0,f64::EPSILON);
     assert_approx_eq!(m[MDIV-1],1.0,f64::EPSILON);
-    let sdiv = 10_usize;
-    let mdiv = 20_usize;
-    println!("Using default constants: sdiv={}, mdiv={}",sdiv,mdiv);
-    let (s,m) = make_grid(Some(sdiv),Some(mdiv));
-    println!("s[0]={:?}, s[{}]={:?}",s[0],sdiv,s[sdiv-1]);
-    println!("m[0]={:?}, s[{}]={:?}",m[0],mdiv,m[mdiv-1]);
-    assert_approx_eq!(s[0]-0.0,f64::EPSILON);
-    assert_approx_eq!(s[sdiv-1],SMAX,f64::EPSILON);
-    assert_approx_eq!(m[0],0.0,f64::EPSILON);
-    assert_approx_eq!(m[mdiv-1],1.0,f64::EPSILON);
+    
 
 }
 
-pub fn make_grid(s_size: Option<usize>, mu_size: Option<usize>) -> (Vec<f64>,Vec<f64>){
+pub fn make_grid() -> ([f64;SDIV],[f64;MDIV]){
 
-    let s_dim = match s_size {
-        Some(s) => s,
-        None => SDIV,
-    };
-    let mu_dim = match mu_size {
-        Some(m) => m ,
-        None => MDIV,
-    };
 
-    let s_gp = (0..s_dim).map(|x| (x as f64) * (SMAX / (s_dim as f64- 1.0))).collect();
-    let mu = (0.. mu_dim).map(|x| (x as f64) / (mu_dim as f64 - 1.0)).collect();
-    (s_gp, mu)
+    let s_gp = &mut [0.0_f64;SDIV];
+    let mu = &mut [0.0_f64;MDIV];
+
+    for (idx, s) in s_gp.iter_mut().enumerate() {
+        *s = (idx as f64) * (SMAX / (SDIV as f64- 1.0));
+    }
+    for (idx, m) in mu.iter_mut().enumerate() {
+        *m = (idx as f64) / (MDIV as f64 - 1.0);
+    }
+
+    // let s_gp = (0 ..= SDIV-1).map(|x| (x as f64) * (SMAX / (SDIV as f64- 1.0)));
+    // let mu = (0 ..= MDIV-1).map(|x| (x as f64) / (MDIV as f64 - 1.0));
+    (*s_gp, *mu)
 
 }
 
@@ -332,7 +325,7 @@ fn test_make_center() {
 }
 
 
-fn make_center(
+pub fn make_center(
         opt_log_e_tab: Option<Vec<f64>>,
         opt_log_p_tab: Option<Vec<f64>>,
         opt_log_h_tab: Option<Vec<f64>>,        

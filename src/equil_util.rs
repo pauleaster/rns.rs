@@ -9,7 +9,7 @@ use std::time::Instant;
 
 
 use crate::consts::*;
-use crate::equil::{e_at_p, e_of_rho0, h_at_p, load_eos, make_grid, p_at_e, read_eos_file, p_at_h};
+use crate::equil::{e_at_p, e_of_rho0, h_at_p, load_eos, make_center, make_grid, p_at_e, p_at_h, read_eos_file};
 
 
 pub enum EosType {
@@ -567,12 +567,24 @@ fn tov(i_check:  ICheck,
 
 
 
-// #[test]
-// fn test_sphere() {
-//     let (s,m) = make_grid(None,None);
-//     sphere(&s);
+#[test]
+fn test_sphere() {
+    let (s,m) = make_grid();
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA").unwrap(); 
+    let eos_type = EosType::Table;
+    // let opt_gamma_p = None;
+    let e_center = 61.1558;
+    let (p_center, h_center) = make_center(Some(log_e_tab), 
+                                            Some(log_p_tab), 
+                                            Some(log_h_tab), 
+                                            EosType::Table, 
+                                            None, 
+                                            e_center).unwrap();
 
-// }
+    // sphere(s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, e_center, p_center, p_surface, 
+    //         e_surface, rho, gama, alpha, omega, r_e);
+
+}
 #[allow(clippy::too_many_arguments)]
 fn sphere(s_gp: &mut[f64;SDIV],
             opt_log_e_tab: &Option<Vec<f64>>,
@@ -760,17 +772,32 @@ fn legendre_poly_lm(l: i32, m: i32, x: f64) -> f64 { // renamed from plgndr()
 }
 
 
-// #[test]
-// fn test_spin() {
-//     let (s,m) = make_grid(None,None);
-//     println!("s.len() = {}, m.len={}", s.len(), m.len());
-//     let now = Instant::now();
-//     spin(&s, &m);
-//     let elapsed = now.elapsed().as_secs_f64();
-//     println!("Elapsed time = {}",elapsed);
+#[test]
+fn test_spin() {
+    // let (s,m) = make_grid(None,None);
+    // let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA").unwrap(); 
+    // let eos_type = EosType::Table;
+    // let opt_gamma_p = None;
+    // let e_center = 61.1558;
+    // let (p_center, h_center) = make_center(Some(log_e_tab), 
+    //                                         Some(log_p_tab), 
+    //                                         Some(log_h_tab), 
+    //                                         EosType::Table, 
+    //                                         None, 
+    //                                         e_center).unwrap();
+
+    // sphere(s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, opt_gamma_p, e_center, p_center, p_surface, 
+    //         e_surface, rho, gama, alpha, omega, r_e);
 
 
-// }
+    // println!("s.len() = {}, m.len={}", s.len(), m.len());
+    // let now = Instant::now();
+    // spin(&s, &m);
+    // let elapsed = now.elapsed().as_secs_f64();
+    // println!("Elapsed time = {}",elapsed);
+
+
+}
 
 /*************************************************************************/
 /* Main iteration cycle for computation of the rotating star's metric    */
@@ -1193,11 +1220,11 @@ fn spin(
 
             s_omega[[s,m]]=e_gsm * e_rsm * ( -ea * (big_omega_h-omsm) * (esm+psm) *s2/(1.0-v2sm) + omsm * ( -0.5 * ea * (((1.0+v2sm) * esm 
 
-                        + 2.0 * v2sm * psm)/(1.0-v2sm)) * s2 - s1 * (2 * d_rho_s+0.5 * d_gama_s)
+                        + 2.0 * v2sm * psm)/(1.0-v2sm)) * s2 - s1 * (2.0 * d_rho_s+0.5 * d_gama_s)
 
-                        + mum * (2 * d_rho_m+0.5 * d_gama_m) + 0.25 * s1.powi(2) * (4 * d_rho_s.powi(2)- d_gama_s.powi(2) ) 
+                        + mum * (2.0 * d_rho_m+0.5 * d_gama_m) + 0.25 * s1.powi(2) * (4.0 * d_rho_s.powi(2)- d_gama_s.powi(2) ) 
                         
-                        + 0.25 * m1 * (4 * d_rho_m.powi(2) - d_gama_m.powi(2) ) - m1 * e_rsm.powi(2) * ( (sgp.powi(2) * d_omega_s).powi(2) 
+                        + 0.25 * m1 * (4.0 * d_rho_m.powi(2) - d_gama_m.powi(2) ) - m1 * e_rsm.powi(2) * ( (sgp.powi(2) * d_omega_s).powi(2) 
                         
                         + s2 * m1 * d_omega_m.powi(2) )));
         } // for m
@@ -1205,329 +1232,329 @@ fn spin(
 
 
 
-    /* ANGULAR INTEGRATION */
+//     /* ANGULAR INTEGRATION */
  
-    D1_rho = dmatrix(1,LMAX+1,1,SDIV);
-    D1_gama = dmatrix(1,LMAX+1,1,SDIV);
-    D1_omega = dmatrix(1,LMAX+1,1,SDIV);
+//     D1_rho = dmatrix(1,LMAX+1,1,SDIV);
+//     D1_gama = dmatrix(1,LMAX+1,1,SDIV);
+//     D1_omega = dmatrix(1,LMAX+1,1,SDIV);
 
-    n=0;
-    for(k=1;k<=SDIV;k++) {      
+//     n=0;
+//     for(k=1;k<=SDIV;k++) {      
 
-       for(m=1;m<=MDIV-2;m+=2) {
-             sum_rho += (DM/3.0)*(p_2n[m][n+1]*s_rho[k][m]
-                        + 4.0*p_2n[m+1][n+1]*s_rho[k][m+1] 
-                        + p_2n[m+2][n+1]*s_rho[k][m+2]);
-   }
+//        for(m=1;m<=MDIV-2;m+=2) {
+//              sum_rho += (DM/3.0)*(p_2n[m][n+1]*s_rho[k][m]
+//                         + 4.0*p_2n[m+1][n+1]*s_rho[k][m+1] 
+//                         + p_2n[m+2][n+1]*s_rho[k][m+2]);
+//    }
 
-       D1_rho[n+1][k]=sum_rho;
-       D1_gama[n+1][k]=0.0;
-       D1_omega[n+1][k]=0.0;
-       sum_rho=0.0;
+//        D1_rho[n+1][k]=sum_rho;
+//        D1_gama[n+1][k]=0.0;
+//        D1_omega[n+1][k]=0.0;
+//        sum_rho=0.0;
 
-    }
+//     }
 
-    for(n=1;n<=LMAX;n++)
-       for(k=1;k<=SDIV;k++) {      
-          for(m=1;m<=MDIV-2;m+=2) {
+//     for(n=1;n<=LMAX;n++)
+//        for(k=1;k<=SDIV;k++) {      
+//           for(m=1;m<=MDIV-2;m+=2) {
 
-             sum_rho += (DM/3.0)*(p_2n[m][n+1]*s_rho[k][m]
-                        + 4.0*p_2n[m+1][n+1]*s_rho[k][m+1] 
-                        + p_2n[m+2][n+1]*s_rho[k][m+2]);
+//              sum_rho += (DM/3.0)*(p_2n[m][n+1]*s_rho[k][m]
+//                         + 4.0*p_2n[m+1][n+1]*s_rho[k][m+1] 
+//                         + p_2n[m+2][n+1]*s_rho[k][m+2]);
                      
-             sum_gama += (DM/3.0)*(sin((2.0*n-1.0)*theta[m])*s_gama[k][m]
-                         +4.0*sin((2.0*n-1.0)*theta[m+1])*s_gama[k][m+1]
-                         +sin((2.0*n-1.0)*theta[m+2])*s_gama[k][m+2]);
+//              sum_gama += (DM/3.0)*(sin((2.0*n-1.0)*theta[m])*s_gama[k][m]
+//                          +4.0*sin((2.0*n-1.0)*theta[m+1])*s_gama[k][m+1]
+//                          +sin((2.0*n-1.0)*theta[m+2])*s_gama[k][m+2]);
 
-             sum_omega += (DM/3.0)*(sin_theta[m]*p1_2n_1[m][n+1]*s_omega[k][m]
-                          +4.0*sin_theta[m+1]*p1_2n_1[m+1][n+1]*s_omega[k][m+1]
-                          +sin_theta[m+2]*p1_2n_1[m+2][n+1]*s_omega[k][m+2]);
-      }
-          D1_rho[n+1][k]=sum_rho;
-          D1_gama[n+1][k]=sum_gama;
-          D1_omega[n+1][k]=sum_omega;
-          sum_rho=0.0;
-          sum_gama=0.0;
-          sum_omega=0.0;
-  }
-
-
-    free_dmatrix(s_gama,1,SDIV,1,MDIV);
-    free_dmatrix(s_rho,1,SDIV,1,MDIV);
-    free_dmatrix(s_omega,1,SDIV,1,MDIV);
+//              sum_omega += (DM/3.0)*(sin_theta[m]*p1_2n_1[m][n+1]*s_omega[k][m]
+//                           +4.0*sin_theta[m+1]*p1_2n_1[m+1][n+1]*s_omega[k][m+1]
+//                           +sin_theta[m+2]*p1_2n_1[m+2][n+1]*s_omega[k][m+2]);
+//       }
+//           D1_rho[n+1][k]=sum_rho;
+//           D1_gama[n+1][k]=sum_gama;
+//           D1_omega[n+1][k]=sum_omega;
+//           sum_rho=0.0;
+//           sum_gama=0.0;
+//           sum_omega=0.0;
+//   }
 
 
-
-    /* RADIAL INTEGRATION */
-
-    D2_rho = dmatrix(1,SDIV,1,LMAX+1);
-    D2_gama = dmatrix(1,SDIV,1,LMAX+1);
-    D2_omega = dmatrix(1,SDIV,1,LMAX+1);
+//     free_dmatrix(s_gama,1,SDIV,1,MDIV);
+//     free_dmatrix(s_rho,1,SDIV,1,MDIV);
+//     free_dmatrix(s_omega,1,SDIV,1,MDIV);
 
 
 
-    n=0;
-    for(s=1;s<=SDIV;s++) {
-          for(k=1;k<=SDIV-2;k+=2) { 
-             sum_rho += (DS/3.0)*( f_rho[s][n+1][k]*D1_rho[n+1][k] 
-                        + 4.0*f_rho[s][n+1][k+1]*D1_rho[n+1][k+1]
-                        + f_rho[s][n+1][k+2]*D1_rho[n+1][k+2]);
-       }
-      D2_rho[s][n+1]=sum_rho;
-      D2_gama[s][n+1]=0.0;
-      D2_omega[s][n+1]=0.0;
-          sum_rho=0.0;
-   }
+//     /* RADIAL INTEGRATION */
+
+//     D2_rho = dmatrix(1,SDIV,1,LMAX+1);
+//     D2_gama = dmatrix(1,SDIV,1,LMAX+1);
+//     D2_omega = dmatrix(1,SDIV,1,LMAX+1);
 
 
-    for(s=1;s<=SDIV;s++)
-       for(n=1;n<=LMAX;n++) {
-          for(k=1;k<=SDIV-2;k+=2) { 
-             sum_rho += (DS/3.0)*( f_rho[s][n+1][k]*D1_rho[n+1][k] 
-                        + 4.0*f_rho[s][n+1][k+1]*D1_rho[n+1][k+1]
-                        + f_rho[s][n+1][k+2]*D1_rho[n+1][k+2]);
 
-             sum_gama += (DS/3.0)*( f_gama[s][n+1][k]*D1_gama[n+1][k] 
-                         + 4.0*f_gama[s][n+1][k+1]*D1_gama[n+1][k+1]
-                         + f_gama[s][n+1][k+2]*D1_gama[n+1][k+2]);
+//     n=0;
+//     for(s=1;s<=SDIV;s++) {
+//           for(k=1;k<=SDIV-2;k+=2) { 
+//              sum_rho += (DS/3.0)*( f_rho[s][n+1][k]*D1_rho[n+1][k] 
+//                         + 4.0*f_rho[s][n+1][k+1]*D1_rho[n+1][k+1]
+//                         + f_rho[s][n+1][k+2]*D1_rho[n+1][k+2]);
+//        }
+//       D2_rho[s][n+1]=sum_rho;
+//       D2_gama[s][n+1]=0.0;
+//       D2_omega[s][n+1]=0.0;
+//           sum_rho=0.0;
+//    }
+
+
+//     for(s=1;s<=SDIV;s++)
+//        for(n=1;n<=LMAX;n++) {
+//           for(k=1;k<=SDIV-2;k+=2) { 
+//              sum_rho += (DS/3.0)*( f_rho[s][n+1][k]*D1_rho[n+1][k] 
+//                         + 4.0*f_rho[s][n+1][k+1]*D1_rho[n+1][k+1]
+//                         + f_rho[s][n+1][k+2]*D1_rho[n+1][k+2]);
+
+//              sum_gama += (DS/3.0)*( f_gama[s][n+1][k]*D1_gama[n+1][k] 
+//                          + 4.0*f_gama[s][n+1][k+1]*D1_gama[n+1][k+1]
+//                          + f_gama[s][n+1][k+2]*D1_gama[n+1][k+2]);
    
-             if(k<s && k+2<=s) 
-               sum_omega += (DS/3.0)*( f_rho[s][n+1][k]*D1_omega[n+1][k] 
-                            + 4.0*f_rho[s][n+1][k+1]*D1_omega[n+1][k+1]
-                            + f_rho[s][n+1][k+2]*D1_omega[n+1][k+2]);
-             else {
-               if(k>=s) 
-                 sum_omega += (DS/3.0)*( f_gama[s][n+1][k]*D1_omega[n+1][k] 
-                              + 4.0*f_gama[s][n+1][k+1]*D1_omega[n+1][k+1]
-                              + f_gama[s][n+1][k+2]*D1_omega[n+1][k+2]);
-               else
-                 sum_omega += (DS/3.0)*( f_rho[s][n+1][k]*D1_omega[n+1][k] 
-                              + 4.0*f_rho[s][n+1][k+1]*D1_omega[n+1][k+1]
-                              + f_gama[s][n+1][k+2]*D1_omega[n+1][k+2]);
-             }
-      }
-      D2_rho[s][n+1]=sum_rho;
-      D2_gama[s][n+1]=sum_gama;
-      D2_omega[s][n+1]=sum_omega;
-          sum_rho=0.0;
-          sum_gama=0.0;
-          sum_omega=0.0;
-   }
+//              if(k<s && k+2<=s) 
+//                sum_omega += (DS/3.0)*( f_rho[s][n+1][k]*D1_omega[n+1][k] 
+//                             + 4.0*f_rho[s][n+1][k+1]*D1_omega[n+1][k+1]
+//                             + f_rho[s][n+1][k+2]*D1_omega[n+1][k+2]);
+//              else {
+//                if(k>=s) 
+//                  sum_omega += (DS/3.0)*( f_gama[s][n+1][k]*D1_omega[n+1][k] 
+//                               + 4.0*f_gama[s][n+1][k+1]*D1_omega[n+1][k+1]
+//                               + f_gama[s][n+1][k+2]*D1_omega[n+1][k+2]);
+//                else
+//                  sum_omega += (DS/3.0)*( f_rho[s][n+1][k]*D1_omega[n+1][k] 
+//                               + 4.0*f_rho[s][n+1][k+1]*D1_omega[n+1][k+1]
+//                               + f_gama[s][n+1][k+2]*D1_omega[n+1][k+2]);
+//              }
+//       }
+//       D2_rho[s][n+1]=sum_rho;
+//       D2_gama[s][n+1]=sum_gama;
+//       D2_omega[s][n+1]=sum_omega;
+//           sum_rho=0.0;
+//           sum_gama=0.0;
+//           sum_omega=0.0;
+//    }
 
-    free_dmatrix(D1_rho,1,LMAX+1,1,SDIV);
-    free_dmatrix(D1_gama,1,LMAX+1,1,SDIV);
-    free_dmatrix(D1_omega,1,LMAX+1,1,SDIV);
+//     free_dmatrix(D1_rho,1,LMAX+1,1,SDIV);
+//     free_dmatrix(D1_gama,1,LMAX+1,1,SDIV);
+//     free_dmatrix(D1_omega,1,LMAX+1,1,SDIV);
 
 
-    /* SUMMATION OF COEFFICIENTS */
+//     /* SUMMATION OF COEFFICIENTS */
 
-    for(s=1;s<=SDIV;s++) 
-       for(m=1;m<=MDIV;m++) {
+//     for(s=1;s<=SDIV;s++) 
+//        for(m=1;m<=MDIV;m++) {
 
-          gsm=gama[[s,m]];
-          rsm=rho[[s,m]];
-          omsm=omega[[s,m]];             
-          e_gsm=exp(-0.5*gsm);
-          e_rsm=exp(rsm);
-          temp1=sin_theta[m];
+//           gsm=gama[[s,m]];
+//           rsm=rho[[s,m]];
+//           omsm=omega[[s,m]];             
+//           e_gsm=exp(-0.5*gsm);
+//           e_rsm=exp(rsm);
+//           temp1=sin_theta[m];
 
-          sum_rho += -e_gsm*p_2n[m][0+1]*D2_rho[s][0+1]; 
+//           sum_rho += -e_gsm*p_2n[m][0+1]*D2_rho[s][0+1]; 
 
-          for(n=1;n<=LMAX;n++) {
+//           for(n=1;n<=LMAX;n++) {
 
-             sum_rho += -e_gsm*p_2n[m][n+1]*D2_rho[s][n+1]; 
+//              sum_rho += -e_gsm*p_2n[m][n+1]*D2_rho[s][n+1]; 
 
-             if(m==MDIV) {             
-               sum_omega += 0.5*e_rsm*e_gsm*D2_omega[s][n+1]; 
-               sum_gama += -(2.0/PI)*e_gsm*D2_gama[s][n+1];   
-         }
-             else { 
-                   sum_omega += -e_rsm*e_gsm*(p1_2n_1[m][n+1]/(2.0*n
-                                *(2.0*n-1.0)*temp1))*D2_omega[s][n+1];
+//              if(m==MDIV) {             
+//                sum_omega += 0.5*e_rsm*e_gsm*D2_omega[s][n+1]; 
+//                sum_gama += -(2.0/PI)*e_gsm*D2_gama[s][n+1];   
+//          }
+//              else { 
+//                    sum_omega += -e_rsm*e_gsm*(p1_2n_1[m][n+1]/(2.0*n
+//                                 *(2.0*n-1.0)*temp1))*D2_omega[s][n+1];
 
-                   sum_gama += -(2.0/PI)*e_gsm*(sin((2.0*n-1.0)*theta[m])
-                               /((2.0*n-1.0)*temp1))*D2_gama[s][n+1];   
-         }
-      }
+//                    sum_gama += -(2.0/PI)*e_gsm*(sin((2.0*n-1.0)*theta[m])
+//                                /((2.0*n-1.0)*temp1))*D2_gama[s][n+1];   
+//          }
+//       }
      
-          rho[[s,m]]=rsm + cf*(sum_rho-rsm);
-          gama[[s,m]]=gsm + cf*(sum_gama-gsm);
-          omega[[s,m]]=omsm + cf*(sum_omega-omsm);
+//           rho[[s,m]]=rsm + cf*(sum_rho-rsm);
+//           gama[[s,m]]=gsm + cf*(sum_gama-gsm);
+//           omega[[s,m]]=omsm + cf*(sum_omega-omsm);
 
-          sum_omega=0.0;
-          sum_rho=0.0;
-          sum_gama=0.0; 
-    }
+//           sum_omega=0.0;
+//           sum_rho=0.0;
+//           sum_gama=0.0; 
+//     }
 
-    free_dmatrix(D2_rho,1,SDIV,1,LMAX+1);
-    free_dmatrix(D2_gama,1,SDIV,1,LMAX+1);
-    free_dmatrix(D2_omega,1,SDIV,1,LMAX+1);
-
-
-    /* CHECK FOR DIVERGENCE */
-
-    if(fabs(omega[2][1])>100.0 || fabs(rho[2][1])>100.0 
-       || fabs(gama[2][1])>300.0) {
-       a_check=200; 
-       break;
-    }
+//     free_dmatrix(D2_rho,1,SDIV,1,LMAX+1);
+//     free_dmatrix(D2_gama,1,SDIV,1,LMAX+1);
+//     free_dmatrix(D2_omega,1,SDIV,1,LMAX+1);
 
 
-    /* TREAT SPHERICAL CASE */
+//     /* CHECK FOR DIVERGENCE */
+
+//     if(fabs(omega[2][1])>100.0 || fabs(rho[2][1])>100.0 
+//        || fabs(gama[2][1])>300.0) {
+//        a_check=200; 
+//        break;
+//     }
+
+
+//     /* TREAT SPHERICAL CASE */
     
-    if(r_ratio==1.0) {
-      for(s=1;s<=SDIV;s++)
-         for(m=1;m<=MDIV;m++) {
-            rho[[s,m]]=rho[s][1];
-            gama[[s,m]]=gama[s][1];
-            omega[[s,m]]=0.0;          
-     }
-    }
+//     if(r_ratio==1.0) {
+//       for(s=1;s<=SDIV;s++)
+//          for(m=1;m<=MDIV;m++) {
+//             rho[[s,m]]=rho[s][1];
+//             gama[[s,m]]=gama[s][1];
+//             omega[[s,m]]=0.0;          
+//      }
+//     }
     
 
-    /* TREAT INFINITY WHEN SMAX=1.0 */
+//     /* TREAT INFINITY WHEN SMAX=1.0 */
 
-    if(SMAX==1.0) {
-       for(m=1;m<=MDIV;m++) {
-          rho[SDIV][m]=0.0;
-          gama[SDIV][m]=0.0;
-          omega[SDIV][m]=0.0;
-   }
-    } 
+//     if(SMAX==1.0) {
+//        for(m=1;m<=MDIV;m++) {
+//           rho[SDIV][m]=0.0;
+//           gama[SDIV][m]=0.0;
+//           omega[SDIV][m]=0.0;
+//    }
+//     } 
 
     
-    /* COMPUTE FIRST ORDER DERIVATIVES OF GAMA */ 
+//     /* COMPUTE FIRST ORDER DERIVATIVES OF GAMA */ 
 
 
-    da_dm = dmatrix(1,SDIV,1,MDIV);
-    dgds = dmatrix(1,SDIV,1,MDIV);
-    dgdm = dmatrix(1,SDIV,1,MDIV); 
+//     da_dm = dmatrix(1,SDIV,1,MDIV);
+//     dgds = dmatrix(1,SDIV,1,MDIV);
+//     dgdm = dmatrix(1,SDIV,1,MDIV); 
 
-    for(s=1;s<=SDIV;s++)
-       for(m=1;m<=MDIV;m++) {
-          dgds[[s,m]]=deriv_s(gama,s,m);
-          dgdm[[s,m]]=deriv_m(gama,s,m);
-   }
+//     for(s=1;s<=SDIV;s++)
+//        for(m=1;m<=MDIV;m++) {
+//           dgds[[s,m]]=deriv_s(gama,s,m);
+//           dgdm[[s,m]]=deriv_m(gama,s,m);
+//    }
 
 
 
-    /* ALPHA */
+//     /* ALPHA */
 
-    if(r_ratio==1.0) {
-      for(s=1;s<=SDIV;s++)
-         for(m=1;m<=MDIV;m++)
-            da_dm[[s,m]]=0.0; 
-    } 
-    else {
-          for(s=2;s<=SDIV;s++)
-             for(m=1;m<=MDIV;m++) {
+//     if(r_ratio==1.0) {
+//       for(s=1;s<=SDIV;s++)
+//          for(m=1;m<=MDIV;m++)
+//             da_dm[[s,m]]=0.0; 
+//     } 
+//     else {
+//           for(s=2;s<=SDIV;s++)
+//              for(m=1;m<=MDIV;m++) {
 
-                da_dm[1][m]=0.0; 
+//                 da_dm[1][m]=0.0; 
      
-                sgp=s_gp[s];
-                s1=sgp*(1.0-sgp);
-                mum=mu[m]; 
-                m1=1.0-SQ(mum);
+//                 sgp=s_gp[s];
+//                 s1=sgp*(1.0-sgp);
+//                 mum=mu[m]; 
+//                 m1=1.0-SQ(mum);
         
-                d_gama_s=dgds[[s,m]];
-                d_gama_m=dgdm[[s,m]];
-                d_rho_s=deriv_s(rho,s,m);
-                d_rho_m=deriv_m(rho,s,m);
-                d_omega_s=deriv_s(omega,s,m);
-                d_omega_m=deriv_m(omega,s,m);
-                d_gama_ss=s1*deriv_s(dgds,s,m)+(1.0-2.0*sgp)
-                                             *d_gama_s;
-                d_gama_mm=m1*deriv_m(dgdm,s,m)-2.0*mum*d_gama_m;  
-                d_gama_sm=deriv_sm(gama,s,m);
+//                 d_gama_s=dgds[[s,m]];
+//                 d_gama_m=dgdm[[s,m]];
+//                 d_rho_s=deriv_s(rho,s,m);
+//                 d_rho_m=deriv_m(rho,s,m);
+//                 d_omega_s=deriv_s(omega,s,m);
+//                 d_omega_m=deriv_m(omega,s,m);
+//                 d_gama_ss=s1*deriv_s(dgds,s,m)+(1.0-2.0*sgp)
+//                                              *d_gama_s;
+//                 d_gama_mm=m1*deriv_m(dgdm,s,m)-2.0*mum*d_gama_m;  
+//                 d_gama_sm=deriv_sm(gama,s,m);
 
-         temp1=2.0*SQ(sgp)*(sgp/(1.0-sgp))*m1*d_omega_s*d_omega_m
+//          temp1=2.0*SQ(sgp)*(sgp/(1.0-sgp))*m1*d_omega_s*d_omega_m
 
-              *(1.0+s1*d_gama_s) - (SQ(SQ(sgp)*d_omega_s) - 
+//               *(1.0+s1*d_gama_s) - (SQ(SQ(sgp)*d_omega_s) - 
 
-              SQ(sgp*d_omega_m/(1.0-sgp))*m1)*(-mum+m1*d_gama_m); 
+//               SQ(sgp*d_omega_m/(1.0-sgp))*m1)*(-mum+m1*d_gama_m); 
 
-         temp2=1.0/(m1 *SQ(1.0+s1*d_gama_s) + SQ(-mum+m1*d_gama_m));
+//          temp2=1.0/(m1 *SQ(1.0+s1*d_gama_s) + SQ(-mum+m1*d_gama_m));
 
-         temp3=s1*d_gama_ss + SQ(s1*d_gama_s);
+//          temp3=s1*d_gama_ss + SQ(s1*d_gama_s);
 
-         temp4=d_gama_m*(-mum+m1*d_gama_m);
+//          temp4=d_gama_m*(-mum+m1*d_gama_m);
  
-         temp5=(SQ(s1*(d_rho_s+d_gama_s)) - m1*SQ(d_rho_m+d_gama_m))
+//          temp5=(SQ(s1*(d_rho_s+d_gama_s)) - m1*SQ(d_rho_m+d_gama_m))
 
-               *(-mum+m1*d_gama_m);
+//                *(-mum+m1*d_gama_m);
 
-         temp6=s1*m1*(0.5*(d_rho_s+d_gama_s)* (d_rho_m+d_gama_m) 
+//          temp6=s1*m1*(0.5*(d_rho_s+d_gama_s)* (d_rho_m+d_gama_m) 
 
-              + d_gama_sm + d_gama_s*d_gama_m)*(1.0 + s1*d_gama_s); 
+//               + d_gama_sm + d_gama_s*d_gama_m)*(1.0 + s1*d_gama_s); 
 
-         temp7=s1*mum*d_gama_s*(1.0+s1*d_gama_s);
+//          temp7=s1*mum*d_gama_s*(1.0+s1*d_gama_s);
 
-         temp8=m1*exp(-2*rho[[s,m]]);
+//          temp8=m1*exp(-2*rho[[s,m]]);
 
-        da_dm[[s,m]] = -0.5*(d_rho_m+d_gama_m) - temp2*(0.5*(temp3 - 
+//         da_dm[[s,m]] = -0.5*(d_rho_m+d_gama_m) - temp2*(0.5*(temp3 - 
 
-          d_gama_mm - temp4)*(-mum+m1*d_gama_m) + 0.25*temp5 
+//           d_gama_mm - temp4)*(-mum+m1*d_gama_m) + 0.25*temp5 
 
-          - temp6 +temp7 + 0.25*temp8*temp1);	 
-     }
- }
+//           - temp6 +temp7 + 0.25*temp8*temp1);	 
+//      }
+//  }
 
-    for(s=1;s<=SDIV;s++) {
-       alpha[s][1]=0.0;
-       for(m=1;m<=MDIV-1;m++) 
-          alpha[s][m+1]=alpha[[s,m]]+0.5*DM*(da_dm[s][m+1]+
-                        da_dm[[s,m]]);
-    } 
-
-
- free_dmatrix(da_dm,1,SDIV,1,MDIV);
- free_dmatrix(dgds,1,SDIV,1,MDIV);
- free_dmatrix(dgdm,1,SDIV,1,MDIV);
+//     for(s=1;s<=SDIV;s++) {
+//        alpha[s][1]=0.0;
+//        for(m=1;m<=MDIV-1;m++) 
+//           alpha[s][m+1]=alpha[[s,m]]+0.5*DM*(da_dm[s][m+1]+
+//                         da_dm[[s,m]]);
+//     } 
 
 
-    for(s=1;s<=SDIV;s++)          
-       for(m=1;m<=MDIV;m++) {     
-          alpha[[s,m]] += -alpha[s][MDIV]+0.5*(gama[s][MDIV]-rho[s][MDIV]);
-
-          if(alpha[[s,m]]>=300.0) {
-            a_check=200; 
-            break;
-          }
-          omega[[s,m]] /= r_e;
-       } 
-
-    if(SMAX==1.0) {
-       for(m=1;m<=MDIV;m++)      
-          alpha[SDIV][m] = 0.0;
-    }
-
-    if(a_check==200)
-      break;
-
-    dif=fabs(r_e_old-r_e)/r_e;
-    n_of_it++;
-
-}   /* end while */
+//  free_dmatrix(da_dm,1,SDIV,1,MDIV);
+//  free_dmatrix(dgds,1,SDIV,1,MDIV);
+//  free_dmatrix(dgdm,1,SDIV,1,MDIV);
 
 
+//     for(s=1;s<=SDIV;s++)          
+//        for(m=1;m<=MDIV;m++) {     
+//           alpha[[s,m]] += -alpha[s][MDIV]+0.5*(gama[s][MDIV]-rho[s][MDIV]);
 
-   /* COMPUTE OMEGA */  
+//           if(alpha[[s,m]]>=300.0) {
+//             a_check=200; 
+//             break;
+//           }
+//           omega[[s,m]] /= r_e;
+//        } 
 
-   if(strcmp(eos_type,"tab")==0) 
-       (*big_omega) = big_omega_h*C/(r_e*sqrt(KAPPA));
-   else
-       (*big_omega) = big_omega_h/r_e;
+//     if(SMAX==1.0) {
+//        for(m=1;m<=MDIV;m++)      
+//           alpha[SDIV][m] = 0.0;
+//     }
+
+//     if(a_check==200)
+//       break;
+
+//     dif=fabs(r_e_old-r_e)/r_e;
+//     n_of_it++;
+
+// }   /* end while */
 
 
-  /* UPDATE r_e_new */
 
-  (*r_e_new) = r_e;
+//    /* COMPUTE OMEGA */  
+
+//    if(strcmp(eos_type,"tab")==0) 
+//        (*big_omega) = big_omega_h*C/(r_e*sqrt(KAPPA));
+//    else
+//        (*big_omega) = big_omega_h/r_e;
 
 
-  free_f3tensor(f_rho, 1,SDIV,1,LMAX+1,1,SDIV);
-  free_f3tensor(f_gama,1,SDIV,1,LMAX+1,1,SDIV);
-  free_dmatrix(p_2n,   1,MDIV,1,LMAX+1);   
-  free_dmatrix(p1_2n_1,1,MDIV,1,LMAX+1);  
+//   /* UPDATE r_e_new */
+
+//   (*r_e_new) = r_e;
+
+
+//   free_f3tensor(f_rho, 1,SDIV,1,LMAX+1,1,SDIV);
+//   free_f3tensor(f_gama,1,SDIV,1,LMAX+1,1,SDIV);
+//   free_dmatrix(p_2n,   1,MDIV,1,LMAX+1);   
+//   free_dmatrix(p1_2n_1,1,MDIV,1,LMAX+1);  
 }
 
 
