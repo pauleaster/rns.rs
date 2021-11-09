@@ -181,7 +181,7 @@ fn test_e_at_p() {
     {
         let opt_gamma_p = Some(2.025_538_636_879_4);
         let eostype = EosType::Polytropic;
-        let (e, nearest) = e_at_p(10.0_f64.powf(0.8), &None, &None, &eostype, opt_gamma_p, None).unwrap();
+        let (e, opt_nearest) = e_at_p(10.0_f64.powf(0.8), &None, &None, &eostype, opt_gamma_p, None).unwrap();
         assert_approx_eq!(e, 8.635_331_229_226_669, 0.000003);
     }
 
@@ -193,21 +193,21 @@ pub fn  e_at_p( pp: f64,
     opt_log_p_tab: &Option<Vec<f64>>,
     eos_type: &EosType,
     opt_gamma_p: Option<f64>,
-    opt_nearest: Option<usize>) -> Result<(f64,usize), Box<dyn Error>> {
+    opt_nearest: Option<usize>) -> Result<(f64,Option<usize>), Box<dyn Error>> {
 
     match eos_type {
         EosType::Table => {
             if let Some(log_e_tab) = opt_log_e_tab { 
                 if let Some(log_p_tab) = opt_log_p_tab {
-                    let (ee, nearest) = interp(&log_p_tab,&log_e_tab,pp.log10(),opt_nearest);
-                    return Ok( (10.0_f64.powf(ee),nearest));
+                    let (ee, opt_nearest) = interp(&log_p_tab,&log_e_tab,pp.log10(),opt_nearest);
+                    return Ok( (10.0_f64.powf(ee),opt_nearest));
                 };
             };
             Err("Using a tabulated EoS but failed to supply both log_e and log_p.".into())
         },
         EosType::Polytropic => {
             if let Some(gamma_p) = opt_gamma_p {
-                return Ok((pp/(gamma_p-1.0) + pp.powf(1.0/gamma_p),0));
+                return Ok((pp/(gamma_p-1.0) + pp.powf(1.0/gamma_p),Some(0)));
             };
             Err("Using polytropic EoS but failed to supply gamma_p.".into())
         },
@@ -221,7 +221,7 @@ fn test_p_at_e() {
     
     let e = 8.635_331_229_226_669;
     let pres = 10.0_f64.powf(0.8);
-    let (p, nearest) = p_at_e(e, &log_e_tab, &log_p_tab, Some(44));
+    let (p, opt_nearest) = p_at_e(e, &log_e_tab, &log_p_tab, Some(44));
     assert_approx_eq!(p, pres,0.002);
     /* Note, because of the interpolation, the inverse for p(e) is different than e(p) by
         delta_p \sim 0.0012 */
@@ -230,13 +230,13 @@ fn test_p_at_e() {
 pub fn p_at_e(ee: f64, 
     log_e_tab: &Vec<f64>, 
     log_p_tab: &Vec<f64>,
-    opt_nearest: Option<usize>) -> (f64, usize) {
+    opt_nearest: Option<usize>) -> (f64, Option<usize>) {
 
-    let (pp, nearest) = interp(&log_e_tab,
+    let (pp, opt_nearest) = interp(&log_e_tab,
         &log_p_tab,
         ee.log10(),
         opt_nearest);
-        (10.0_f64.powf(pp), nearest)
+        (10.0_f64.powf(pp), opt_nearest)
 } 
 
 // /*C*/
@@ -249,13 +249,13 @@ fn test_p_at_h() {
 fn  p_at_h(hh : f64, 
     log_p_tab: &Vec<f64>, 
     log_h_tab: &Vec<f64>,
-    opt_nearest: Option<usize>) -> (f64, usize) {
+    opt_nearest: Option<usize>) -> (f64, Option<usize>) {
 
-    let (pp, nearest) = interp(&log_h_tab.to_vec(),
+    let (pp, opt_nearest) = interp(&log_h_tab.to_vec(),
                                         &log_p_tab.to_vec(),
                                         hh.log10(),
                                         opt_nearest);
-    (10.0_f64.powf(pp), nearest)
+    (10.0_f64.powf(pp), opt_nearest)
 }
 
 // /*C*/
@@ -268,13 +268,13 @@ fn test_h_at_p() {
 pub fn  h_at_p(pp : f64, 
     log_h_tab: &Vec<f64>, 
     log_p_tab: &Vec<f64>,
-    opt_nearest: Option<usize>) -> (f64, usize) {
+    opt_nearest: Option<usize>) -> (f64, Option<usize>) {
 
-    let (h, nearest) = interp(&log_p_tab,
+    let (h, opt_nearest) = interp(&log_p_tab,
                                     &log_h_tab,
                                     pp.log10(),
                                     opt_nearest);
-    (10.0_f64.powf(h), nearest)
+    (10.0_f64.powf(h), opt_nearest)
 }
 
 
@@ -287,13 +287,13 @@ fn test_n0_at_e() {
 fn  n0_at_e(ee : f64, 
     log_n0_tab: &Vec<f64>, 
     log_e_tab: &Vec<f64>,
-    opt_nearest: Option<usize>) -> (f64, usize) {
+    opt_nearest: Option<usize>) -> (f64, Option<usize>) {
 
-    let (n0, nearest) = interp(&log_e_tab,
+    let (n0, opt_nearest) = interp(&log_e_tab,
                                     &log_n0_tab,
                                     ee.log10(),
                                     opt_nearest);     
-    (10.0_f64.powf(n0), nearest)
+    (10.0_f64.powf(n0), opt_nearest)
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn make_center(
                 if let Some(log_p_tab) = opt_log_p_tab { 
                     if let Some(log_h_tab) = opt_log_h_tab { 
                         let nearest=log_e_tab.len()>>1;
-                        let (p_center, nearest) = p_at_e( e_center, 
+                        let (p_center, _) = p_at_e( e_center, 
                                                         &log_p_tab, 
                                                         &log_e_tab, 
                                                         Some(nearest));

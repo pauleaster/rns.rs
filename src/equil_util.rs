@@ -164,7 +164,7 @@ fn test_interp() {
 pub fn interp(  xp: &[f64], 
             yp: &[f64], 
             xb: f64,
-            opt_nearest: Option<usize>) -> (f64, usize) { 
+            opt_nearest: Option<usize>) -> (f64, Option<usize>) { 
 
     let nearest = hunt(xp,xb, opt_nearest);
 
@@ -184,7 +184,7 @@ pub fn interp(  xp: &[f64],
     ((xb-xp[k+1])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k]/ d0
         + (xb-xp[k])*(xb-xp[k+2])*(xb-xp[k+3])*yp[k+1]/ d1 
         + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+3])*yp[k+2]/ d2
-        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d3, nearest)
+        + (xb-xp[k])*(xb-xp[k+1])*(xb-xp[k+2])*yp[k+3]/ d3, Some(nearest))
 
     
 }
@@ -332,18 +332,18 @@ fn dm_dr_is(r_is: f64,
             opt_log_p_tab: &Option<Vec<f64>>, 
             opt_nearest: Option<usize>, 
             eos_type: &EosType, 
-            opt_gamma_p: Option<f64>) -> (f64, usize) {
+            opt_gamma_p: Option<f64>) -> (f64, Option<usize>) {
 
 
-    let (e_d, nearest)  = if p<p_surface {
-        (0.0_f64,0)
+    let (e_d, opt_nearest)  = if p<p_surface {
+        (0.0_f64,Some(0))
         } else {
             e_at_p(p, 
                     opt_log_e_tab, opt_log_p_tab, eos_type, opt_gamma_p, opt_nearest).unwrap()
                 };
     match r_is < RMIN {
-        true => (4.0 * PI * e_center * r * r * (1.0 + 4.0 * PI * e_center * r * r / 3.0), nearest),
-        false => (4.0 * PI * e_d * r * r * r * (1.0 - 2.0 * m / r).sqrt() / r_is, nearest),
+        true => (4.0 * PI * e_center * r * r * (1.0 + 4.0 * PI * e_center * r * r / 3.0), opt_nearest),
+        false => (4.0 * PI * e_d * r * r * r * (1.0 - 2.0 * m / r).sqrt() / r_is, opt_nearest),
     }
 }
 
@@ -359,17 +359,17 @@ fn dp_dr_is(r_is: f64,
     opt_log_p_tab: &Option<Vec<f64>>, 
     opt_nearest: Option<usize>, 
     eos_type: &EosType, 
-    opt_gamma_p: Option<f64>) -> (f64, usize) {
+    opt_gamma_p: Option<f64>) -> (f64, Option<usize>) {
 
-    let (e_d, nearest)  = if p<p_surface {
-        (0.0_f64,0)
+    let (e_d, opt_nearest)  = if p<p_surface {
+        (0.0_f64,Some(0))
         } else {
             e_at_p(p, 
                     opt_log_e_tab, opt_log_p_tab, eos_type, opt_gamma_p, opt_nearest).unwrap()
                 };
         match r_is < RMIN {
-            true => (-4.0 * PI * (e_center + p) * (e_center + 3.0 * p) * r * (1.0 + 4.0 * e_center * r * r / 3.0) / 3.0, nearest),
-            false => (-(e_d + p) * (m + 4.0 * PI * r * r * r * p) / (r * r_is * (1.0-2.0*m/r).sqrt()), nearest),
+            true => (-4.0 * PI * (e_center + p) * (e_center + 3.0 * p) * r * (1.0 + 4.0 * e_center * r * r / 3.0) / 3.0, opt_nearest),
+            false => (-(e_d + p) * (m + 4.0 * PI * r * r * r * p) / (r * r_is * (1.0-2.0*m/r).sqrt()), opt_nearest),
         }
 }
 
@@ -455,8 +455,7 @@ fn tov(i_check:  ICheck,
 
     while p>= p_surface {
 
-        let (e_d, nearest) = e_at_p(p,opt_log_e_tab,opt_log_p_tab,eos_type,opt_gamma_p,opt_nearest).unwrap();
-        opt_nearest = Some(nearest);
+        let (e_d, opt_nearest) = e_at_p(p,opt_log_e_tab,opt_log_p_tab,eos_type,opt_gamma_p,opt_nearest).unwrap();
 
         if matches!(i_check, ICheck::Final) && (r_is>r_is_check) && (i< RDIV) {
                     r_is_gp[i]=r_is;
@@ -472,9 +471,8 @@ fn tov(i_check:  ICheck,
 
         let a1=dr_dr_is(r_is,r,m);
 
-        let (b1, nearest)=dm_dr_is(r_is,r,m,p, e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
+        let (b1, opt_nearest)=dm_dr_is(r_is,r,m,p, e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                                 opt_nearest, eos_type, opt_gamma_p);
-        opt_nearest = Some(nearest);
         let (c1, _) = dp_dr_is(r_is,r,m,p, e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
             opt_nearest, eos_type, opt_gamma_p);
 
@@ -482,11 +480,10 @@ fn tov(i_check:  ICheck,
 
         let a2=dr_dr_is(r_is+h/2.0, r+h*a1/2.0, m+h*b1/2.0);
 
-        let (b2, nearest)=dm_dr_is(r_is+h/2.0, r+h*a1/2.0, m+h*b1/2.0, p+h*c1/2.0, 
+        let (b2, opt_nearest)=dm_dr_is(r_is+h/2.0, r+h*a1/2.0, m+h*b1/2.0, p+h*c1/2.0, 
                                         e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                         opt_nearest, eos_type, opt_gamma_p);
 
-        opt_nearest = Some(nearest);
         let (c2, _) = dp_dr_is(r_is+h/2.0, r+h*a1/2.0, m+h*b1/2.0, p+h*c1/2.0, 
                                                 e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                                 opt_nearest, eos_type, opt_gamma_p);
@@ -495,11 +492,10 @@ fn tov(i_check:  ICheck,
 
         let a3=dr_dr_is(r_is+h/2.0, r+h*a2/2.0, m+h*b2/2.0);
 
-        let (b3, nearest)=dm_dr_is(r_is+h/2.0, r+h*a2/2.0, m+h*b2/2.0, p+h*c2/2.0, 
+        let (b3, opt_nearest)=dm_dr_is(r_is+h/2.0, r+h*a2/2.0, m+h*b2/2.0, p+h*c2/2.0, 
                                                         e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                                         opt_nearest, eos_type, opt_gamma_p);
 
-        opt_nearest = Some(nearest);
         let (c3, _)=dp_dr_is(r_is+h/2.0, r+h*a2/2.0, m+h*b2/2.0, p+h*c2/2.0, 
                                                 e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                                 opt_nearest, eos_type, opt_gamma_p);
@@ -508,10 +504,9 @@ fn tov(i_check:  ICheck,
 
         let a4=dr_dr_is(r_is+h, r+h*a3, m+h*b3);
 
-        let (b4, nearest)=dm_dr_is(r_is+h, r+h*a3, m+h*b3, p+h*c3, 
+        let (b4, opt_nearest)=dm_dr_is(r_is+h, r+h*a3, m+h*b3, p+h*c3, 
                                                     e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
                                                     opt_nearest, eos_type, opt_gamma_p);
-        opt_nearest = Some(nearest);
         
         let (c4, _)=dp_dr_is(r_is+h, r+h*a3, m+h*b3, p+h*c3, 
                                         e_center, p_surface, opt_log_e_tab, opt_log_p_tab, 
@@ -550,8 +545,7 @@ fn tov(i_check:  ICheck,
                 true => 0.0,
                 false => match eos_type {
                     EosType::Table => {
-                        let (p, nearest) = p_at_e(e_d_gp[i], opt_log_e_tab.as_ref().unwrap(), opt_log_p_tab.as_ref().unwrap(), opt_nearest);
-                        opt_nearest = Some(nearest);
+                        let (p, _) = p_at_e(e_d_gp[i], opt_log_e_tab.as_ref().unwrap(), opt_log_p_tab.as_ref().unwrap(), opt_nearest);
                         h_at_p(p, opt_log_h_tab.as_ref().unwrap(), opt_log_p_tab.as_ref().unwrap(), opt_nearest).0
                     }, // Table
                     EosType::Polytropic => {
@@ -632,8 +626,7 @@ fn sphere(s_gp: &mut[f64;SDIV],
         let r_is_s=*r_is_final*(s_gp[s]/(1.0-s_gp[s]));
 
         let (nu_s, lambda_s) = if r_is_s < *r_is_final {
-            let (lambda_s, nearest)=interp(r_is_gp,lambda_gp,r_is_s,Some(nearest));
-            let opt_nearest = Some(nearest);
+            let (lambda_s, opt_nearest)=interp(r_is_gp,lambda_gp,r_is_s,Some(nearest));
             let (nu_s, _)=interp(r_is_gp,nu_gp,r_is_s, opt_nearest);
             (nu_s, lambda_s)
             }
@@ -659,8 +652,7 @@ fn sphere(s_gp: &mut[f64;SDIV],
     }
 
     let opt_nearest = Some(SDIV>>1);
-    let (gama_eq, nearest) = interp(s_gp,gama_mu_0,s_e,opt_nearest); /* gama at equator */
-    let opt_nearest = Some(nearest);
+    let (gama_eq, opt_nearest) = interp(s_gp,gama_mu_0,s_e,opt_nearest); /* gama at equator */
     let (rho_eq, _) = interp(s_gp,rho_mu_0,s_e, opt_nearest);   /* rho at equator */
 
     (*r_e)= *r_final * (0.5*(rho_eq-gama_eq)).exp(); 
@@ -794,10 +786,10 @@ fn spin(
     // opt_gamma_p: &Option <f64>, 
     // h_center: f64,
     // enthalpy_min: f64,
-    // rho: &Array2<f64>,
-    // gama: &Array2<f64>,
-    // alpha: &Array2<f64>,
-    // omega: &Array2<f64>,
+    rho: &mut Array2<f64>,
+    gama: &mut Array2<f64>,
+    alpha: &mut Array2<f64>,
+    omega: &mut Array2<f64>,
     // energy: &Array2<f64>,
     // pressure: &Array2<f64>,
     // enthalpy: &Array2<f64>,
@@ -805,8 +797,8 @@ fn spin(
     // a_check: bool, 
     // accuracy: f64,
     // cf: f64,
-    // r_ratio: f64,
-    // r_e_new: &mut f64,
+    r_ratio: f64,
+    r_e_new: &mut f64,
     // big_omega: &mut f64
 )
 
@@ -882,7 +874,7 @@ fn spin(
 //        rho_mu_1[SDIV+1],             /* rho at \mu=1 */
 //        rho_mu_0[SDIV+1],             /* rho at \mu=0 */
 //        omega_mu_0[SDIV+1],           /* omega at \mu=0 */
-//        s_e=0.5,
+       let s_e=0.5;
 //      **da_dm,
 //      **dgds,
 //      **dgdm,
@@ -1011,74 +1003,85 @@ fn spin(
     } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
 
 
-
-// for(m=1;m<=MDIV;m++) { 
-//    sin_theta[m] = sqrt(1.0-mu[m]*mu[m]);  
-//    theta[m] = asin(sin_theta[m]);
-// }
-
-
-// r_e = (*r_e_new);
-
-// while(dif> accuracy || n_of_it<2) { 
-
-//     if(print_dif!=0)
-//        printf("%4.3e\n",dif);
+    let sin_theta = &mut [0_f64;MDIV];
+    let theta = &mut [0_f64;MDIV];
+    
+    for m in 0 ..= MDIV - 1 { //for(m=1;m<=MDIV;m++) { 
+        sin_theta[m] = (1.0-mu[m]*mu[m]).sqrt();   // Why not acos(mu[m]) ?
+        theta[m] = sin_theta[m].asin();
+    }
 
 
-//     /* Rescale potentials and construct arrays with the potentials along
-//      | the equatorial and polar directions.
-//     */        
+    let r_e = *r_e_new;
 
-//     for(s=1;s<=SDIV;s++) {
-//        for(m=1;m<=MDIV;m++) {
-//           rho[s][m] /= SQ(r_e);
-//           gama[s][m] /= SQ(r_e); 
-//           alpha[s][m] /= SQ(r_e);
-//           omega[s][m] *= r_e;
-//        }
-//        rho_mu_0[s]=rho[s][1];     
-//        gama_mu_0[s]=gama[s][1];   
-//        omega_mu_0[s]=omega[s][1]; 
-//        rho_mu_1[s]=rho[s][MDIV];  
-//        gama_mu_1[s]=gama[s][MDIV];
-//     }
+    // ********* leave this logging out for now ***********
+    // while(dif> accuracy || n_of_it<2) { 
 
-//     /* Compute new r_e. */ 
-
-//     r_e_old=r_e;
-//     r_p=r_ratio*r_e;                          
-//     s_p=r_p/(r_p+r_e);                        
-
-//     n_nearest= SDIV/2;
-//     gama_pole_h=interp(s_gp,gama_mu_1,SDIV,s_p,&n_nearest); 
-//     gama_equator_h=interp(s_gp,gama_mu_0,SDIV,s_e,&n_nearest);
-//     gama_center_h=gama[1][1];                    
-
-//     rho_pole_h=interp(s_gp,rho_mu_1,SDIV,s_p,&n_nearest);   
-//     rho_equator_h=interp(s_gp,rho_mu_0,SDIV,s_e,&n_nearest);
-//     rho_center_h=rho[1][1];                      
-
-//     r_e=sqrt(2*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h));
+    //     if(print_dif!=0)
+    //     printf("%4.3e\n",dif);
 
 
-//     /* Compute angular velocity big_omega. */
 
-//     if(r_ratio==1.0) {
-//       big_omega_h=0.0;
-//       omega_equator_h=0.0;
-//     } 
-//     else {
-//           omega_equator_h=interp(s_gp,omega_mu_0,SDIV,s_e, &n_nearest);
-//           term_in_big_omega_h=1.0-exp(SQ(r_e)*(gama_pole_h+rho_pole_h
-//                                            -gama_equator_h-rho_equator_h));
-//           if(term_in_big_omega_h>=0.0) 
-//              big_omega_h = omega_equator_h + exp(SQ(r_e)*rho_equator_h)
-//                                           *sqrt(term_in_big_omega_h);
-//           else {
-//               big_omega_h=0.0;
-//       }
-//     }
+    /* Rescale potentials and construct arrays with the potentials along
+    | the equatorial and polar directions.
+    */
+    
+    let rho_mu_0= &mut [0.0_f64;SDIV];     
+    let gama_mu_0= &mut [0.0_f64;SDIV];   
+    let omega_mu_0= &mut [0.0_f64;SDIV];  
+    let rho_mu_1= &mut [0.0_f64;SDIV]; 
+    let gama_mu_1= &mut [0.0_f64;SDIV]; 
+    
+    for s in 0 ..= SDIV-1 { //for(s=1;s<=SDIV;s++) {
+        for m in 0 ..= MDIV-1 { //for(m=1;m<=MDIV;m++) {
+            let re_sq = r_e.powi(2);
+            rho[[s,m]] /= re_sq;
+            gama[[s,m]] /= re_sq; 
+            alpha[[s,m]] /= re_sq;
+            omega[[s,m]] *= r_e; 
+        }
+        rho_mu_0[s]=rho[[s,0]];     
+        gama_mu_0[s]=gama[[s,0]];   
+        omega_mu_0[s]=omega[[s,0]]; 
+        rho_mu_1[s]=rho[[s,MDIV-1]];  
+        gama_mu_1[s]=gama[[s,MDIV-1]];
+    }
+
+    /* Compute new r_e. */ 
+
+    let mut r_e_old= r_e;
+    let r_p= r_ratio*r_e;                          
+    let s_p=r_p/(r_p+r_e);                        
+
+    let opt_nearest= Some(SDIV>>1);
+    let (gama_pole_h, opt_nearest)=interp(s_gp,gama_mu_1,s_p,opt_nearest); 
+    let (gama_equator_h, opt_nearest)=interp(s_gp,gama_mu_0,s_e,opt_nearest);
+    let gama_center_h=gama[[0,0]];                    
+
+    rho_pole_h=interp(s_gp,rho_mu_1,SDIV,s_p,&n_nearest);   
+    rho_equator_h=interp(s_gp,rho_mu_0,SDIV,s_e,&n_nearest);
+    rho_center_h=rho[1][1];                      
+
+    r_e=sqrt(2*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h));
+
+
+    /* Compute angular velocity big_omega. */
+
+    if(r_ratio==1.0) {
+    big_omega_h=0.0;
+    omega_equator_h=0.0;
+    } 
+    else {
+        omega_equator_h=interp(s_gp,omega_mu_0,SDIV,s_e, &n_nearest);
+        term_in_big_omega_h=1.0-exp(SQ(r_e)*(gama_pole_h+rho_pole_h
+                                        -gama_equator_h-rho_equator_h));
+        if(term_in_big_omega_h>=0.0) 
+            big_omega_h = omega_equator_h + exp(SQ(r_e)*rho_equator_h)
+                                        *sqrt(term_in_big_omega_h);
+        else {
+            big_omega_h=0.0;
+    }
+    }
 
 
 //     /* Compute velocity, energy density and pressure. */
