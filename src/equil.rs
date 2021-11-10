@@ -146,6 +146,25 @@ pub fn load_eos(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f
     Ok((log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab))
 }
 
+
+pub fn get_e_p_surface( eos_type: &EosType) -> (f64, f64) {
+
+    match eos_type {
+        EosType::Table => (7.8 * CC * CC * KSCALE, 1.01e8 * KSCALE),
+        EosType::Polytropic => (0., 0.),
+    }
+}
+
+pub fn get_min_enthalpy( eos_type: &EosType) -> f64 {
+
+    match eos_type {
+        EosType::Table => 1. / CC / CC,
+        EosType::Polytropic => 0.,
+    }
+}
+
+
+
 #[test]
 fn test_e_of_rho0() { // Should use scaled values here!!
     let rho0 = 5e14;
@@ -291,46 +310,34 @@ fn  n0_at_e(ee : f64,
 
 #[test]
 fn test_make_center() {
-    {
-        let e_center = 78.8906; //61.1558;
-        let (log_e_tab, 
-            log_p_tab, 
-            log_h_tab, _, _) = load_eos("./eos/eosA").unwrap();
-        let (p_center, h_center) = make_center(Some(log_e_tab), 
-                                            Some(log_p_tab), 
-                                            Some(log_h_tab), 
-                                            EosType::Table, 
-                                            None, 
-                                            e_center).unwrap();
-        println!("p_c = {}, h_c = {}", p_center, h_center);
-        assert_approx_eq!(p_center, 69.08546357,0.00001);
-        assert_approx_eq!(h_center, 2.332765405,0.0000001);
-    }
-    {
-        let e_center = 61.1558;
-        let gamma = 2.2639; 
-        let rho0_center = 6.4936_f64;
-        let p_center = rho0_center.powf(gamma);
-        let h_center = (e_center+p_center)/rho0_center;
-        let (p_calc, h_calc) = make_center(None, 
-                                        None, 
-                                        None,
-                                        EosType::Polytropic, 
-                                        Some(gamma),
-                                        e_center).unwrap();
-        assert_approx_eq!(p_calc, p_center,0.003);
-        assert_approx_eq!(h_calc, h_center,0.0001);
-        
-    }
+    let (s,m) = make_grid();
+    let (log_e_tab, log_p_tab, log_h_tab, _, _) = load_eos("./eos/eosA").unwrap(); 
+    let eos_type = &EosType::Table;
+    // let opt_gamma_p = None;
+    let opt_log_e_tab = &Some(log_e_tab);
+    let opt_log_p_tab = &Some(log_p_tab);
+    let opt_log_h_tab = &Some(log_h_tab);
+    let unscaled_e_center = 1e15;
+    let e_center = unscaled_e_center * CC * CC * KSCALE;
+    let (p_center, h_center) = make_center(opt_log_e_tab, 
+        opt_log_p_tab , 
+        opt_log_h_tab, 
+        eos_type, 
+        &None, 
+        e_center).unwrap();
+    println!("p_c, h_c, e_c = {:9.8e}, {:9.8e}, {:9.8e}", p_center, h_center, e_center);
+    assert_approx_eq!(p_center, 9.01912632e-02);
+    assert_approx_eq!(h_center, 1.49230395e-01);
+
 }
 
 
 pub fn make_center(
-        opt_log_e_tab: Option<Vec<f64>>,
-        opt_log_p_tab: Option<Vec<f64>>,
-        opt_log_h_tab: Option<Vec<f64>>,        
-        eos_type: EosType,
-        opt_gamma_p: Option<f64>, 
+        opt_log_e_tab: &Option<Vec<f64>>,
+        opt_log_p_tab: &Option<Vec<f64>>,
+        opt_log_h_tab: &Option<Vec<f64>>,        
+        eos_type: &EosType,
+        opt_gamma_p: &Option<f64>, 
         e_center: f64) -> Result<(f64, f64),Box<dyn Error>> {
 
     // let mut nearest: usize;
@@ -341,12 +348,12 @@ pub fn make_center(
                     if let Some(log_h_tab) = opt_log_h_tab { 
                         let nearest=log_e_tab.len()>>1;
                         let (p_center, _) = p_at_e( e_center, 
-                                                        &log_p_tab, 
-                                                        &log_e_tab, 
+                                                        log_e_tab, 
+                                                        log_p_tab, 
                                                         Some(nearest));
                         let (h_center, _) = h_at_p( p_center, 
-                                                            &log_h_tab, 
-                                                            &log_p_tab, 
+                                                            log_h_tab, 
+                                                            log_p_tab, 
                                                             Some(nearest));
                         return Ok((p_center, h_center));
 
@@ -358,9 +365,9 @@ pub fn make_center(
         },
         EosType::Polytropic => {
             if let Some(gamma_p) = opt_gamma_p {
-                let rho0_center = rtsec_g( &e_of_rho0, gamma_p, 0.0,e_center,f64::EPSILON, 
+                let rho0_center = rtsec_g( &e_of_rho0, *gamma_p, 0.0,e_center,f64::EPSILON, 
                                     e_center )?;
-                let p_center = rho0_center.powf(gamma_p);
+                let p_center = rho0_center.powf(*gamma_p);
                 return Ok((p_center, (e_center+p_center)/rho0_center)); // log removed!!!!!
             };
             Err("gamma_p not supplied for EoS".into())

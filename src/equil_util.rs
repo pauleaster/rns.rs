@@ -9,7 +9,7 @@ use std::time::Instant;
 
 
 use crate::consts::*;
-use crate::equil::{e_at_p, e_of_rho0, h_at_p, load_eos, make_center, make_grid, p_at_e, p_at_h, read_eos_file};
+use crate::equil::{e_at_p, e_of_rho0, get_e_p_surface, h_at_p, load_eos, make_center, make_grid, p_at_e, p_at_h, read_eos_file};
 
 
 pub enum EosType {
@@ -417,9 +417,9 @@ fn tov(i_check:  ICheck,
     let dr_is_save: f64;
     let mut r_is_check: f64;
 
-    let mut r_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
-    let mut m_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
-    let mut e_d_gp: Vec<f64> = Vec::with_capacity(RDIV+1);
+    let mut r_gp = [0.; RDIV+1]; // Vec::with_capacity(RDIV+1);
+    let mut m_gp = [0.; RDIV+1]; //  Vec::with_capacity(RDIV+1);
+    let mut e_d_gp = [0.; RDIV+1]; //  Vec::with_capacity(RDIV+1);
 
     match i_check {
         ICheck::Initial => {
@@ -515,6 +515,8 @@ fn tov(i_check:  ICheck,
         r += (h/6.0)*(a1+2.*a2+2.*a3+a4);
         m += (h/6.0)*(b1+2.*b2+2.*b3+b4);
         p += (h/6.0)*(c1+2.*c2+2.*c3+c4);
+
+        println!("r,m,p = {:9.8e}, {:9.8e}, {:9.8e}",r,m,p);
     
         r_is += h;
 
@@ -570,23 +572,63 @@ fn tov(i_check:  ICheck,
 #[test]
 fn test_sphere() {
     let (s,m) = make_grid();
-    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, n_tab) = load_eos("./eos/eosA").unwrap(); 
-    let eos_type = EosType::Table;
+    let (log_e_tab, log_p_tab, log_h_tab, _, _) = load_eos("./eos/eosA").unwrap(); 
+    let eos_type = &EosType::Table;
     // let opt_gamma_p = None;
-    let e_center = 61.1558;
-    let (p_center, h_center) = make_center(Some(log_e_tab), 
-                                            Some(log_p_tab), 
-                                            Some(log_h_tab), 
-                                            EosType::Table, 
-                                            None, 
+    let opt_log_e_tab = &Some(log_e_tab);
+    let opt_log_p_tab = &Some(log_p_tab);
+    let opt_log_h_tab = &Some(log_h_tab);
+    let unscaled_e_center = 1e15;
+    let e_center = unscaled_e_center * CC * CC * KSCALE;
+    
+    let (p_center, _) = make_center(opt_log_e_tab, 
+                                            opt_log_p_tab , 
+                                            opt_log_h_tab, 
+                                            &EosType::Table, 
+                                            &None, 
                                             e_center).unwrap();
 
-    // sphere(s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, e_center, p_center, p_surface, 
-    //         e_surface, rho, gama, alpha, omega, r_e);
+    let (e_surface, p_surface) = get_e_p_surface(eos_type);
+    let mut rho = &mut Array2::<f64>::ones((SDIV, MDIV)); 
+    let mut gama = &mut Array2::<f64>::ones((SDIV, MDIV)); 
+    let mut alpha = &mut Array2::<f64>::ones((SDIV, MDIV)); 
+    let mut omega = &mut Array2::<f64>::ones((SDIV, MDIV)); 
+    let mut r_e = 0.0;
+
+    *rho *= 100.0;
+    *gama *= 100.0;
+    *alpha *= 100.0;
+    *omega *= 100.0;
+    
+
+    sphere(&s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, 
+            e_center, p_center, p_surface, e_surface, &mut rho, &mut gama, &mut alpha, &mut omega, &mut r_e);
+
+    // Values calibrated from the RNS c code
+
+    println!("e_center = {}",e_center);
+    println!("rho[0][0] = {:13.9e}",rho[[0,0]]);
+    assert_approx_eq!(rho[[0,0]], -5.479849684e-01);
+    assert_approx_eq!(rho[[(SDIV>>1)-1,(MDIV>>1)-1]], -2.785717738e-01);
+    assert_approx_eq!(rho[[SDIV-1,MDIV-1]], -2.743658910e-05);
+    
+    assert_approx_eq!(gama[[0,0]], -2.524611504e-02);
+    assert_approx_eq!(gama[[(SDIV>>1)-1,(MDIV>>1)-1]],  -5.037446991e-03);
+    assert_approx_eq!(gama[[SDIV-1,MDIV-1]], -4.704792253e-11);
+    
+    assert_approx_eq!(alpha[[0,0]], 2.613694267e-01);
+    assert_approx_eq!(alpha[[(SDIV>>1)-1,(MDIV>>1)-1]], 1.367671634e-01);
+    assert_approx_eq!(alpha[[SDIV-1,MDIV-1]], 1.371827103e-05);
+    
+    assert_approx_eq!(omega[[0,0]], 0.0);
+    assert_approx_eq!(omega[[(SDIV>>1)-1,(MDIV>>1)-1]], 0.0);
+    assert_approx_eq!(omega[[SDIV-1,MDIV-1]], 0.0);
+
+    assert_approx_eq!(r_e, 2.373788814e-01);
 
 }
 #[allow(clippy::too_many_arguments)]
-fn sphere(s_gp: &mut[f64;SDIV],
+fn sphere(s_gp: &[f64;SDIV],
             opt_log_e_tab: &Option<Vec<f64>>,
             opt_log_p_tab: &Option<Vec<f64>>,
             opt_log_h_tab: &Option<Vec<f64>>,
@@ -621,16 +663,35 @@ fn sphere(s_gp: &mut[f64;SDIV],
     tov(ICheck::Initial, e_center, p_center, e_surface, p_surface, opt_log_e_tab, 
         opt_log_p_tab, opt_log_h_tab, eos_type, opt_gamma_p,
         r_is_gp, lambda_gp, nu_gp, r_is_final, r_final, m_final);
+        
+    // println!("tov initial\n");
+    // println!("*********************");
+    // println!("r_is_gp=\n{:?}", r_is_gp);
+    // println!("lambda_gp=\n{:?}", lambda_gp);
+    // println!("nu_gp=\n{:?}", nu_gp);
+    // println!("\nr_is_final, r_final, m_final = ({}, {}, {})\n",r_is_final, r_final, m_final);
     
     tov(ICheck::Intermediate, e_center, p_center, e_surface, p_surface, opt_log_e_tab, 
         opt_log_p_tab, opt_log_h_tab, eos_type, opt_gamma_p,
         r_is_gp, lambda_gp, nu_gp, r_is_final, r_final, m_final);
 
+    // println!("tov Intermediate\n");
+    // println!("*********************");
+    // println!("r_is_gp=\n{:?}", r_is_gp);
+    // println!("lambda_gp=\n{:?}", lambda_gp);
+    // println!("nu_gp=\n{:?}", nu_gp);
+    // println!("\nr_is_final, r_final, m_final = ({}, {}, {})\n",r_is_final, r_final, m_final);
+
     tov(ICheck::Final, e_center, p_center, e_surface, p_surface, opt_log_e_tab, 
         opt_log_p_tab, opt_log_h_tab, eos_type, opt_gamma_p,
         r_is_gp, lambda_gp, nu_gp, r_is_final, r_final, m_final);
 
-
+    // println!("tov Final\n");
+    // println!("*********************");
+    // println!("r_is_gp=\n{:?}", r_is_gp);
+    // println!("lambda_gp=\n{:?}", lambda_gp);
+    // println!("nu_gp=\n{:?}", nu_gp);
+    println!("\nr_is_final, r_final, m_final = ({}, {}, {})\n",r_is_final, r_final, m_final);
 
 
     let nearest= RDIV >> 1;
@@ -649,12 +710,12 @@ fn sphere(s_gp: &mut[f64;SDIV],
             };
 
         gama[[s,0]]=nu_s+lambda_s;
-        rho[[s,1]]=nu_s-lambda_s;
+        rho[[s,0]]=nu_s-lambda_s;
 
         for m in 0.. MDIV {
-            gama[[s,m]]=gama[[s,1]];        
-            rho[[s,m]]=rho[[s,1]];
-            alpha[[s,m]]=(gama[[s,1]]-rho[[s,1]])/2.0;
+            gama[[s,m]]=gama[[s,0]];        
+            rho[[s,m]]=rho[[s,0]];
+            alpha[[s,m]]=(gama[[s,0]]-rho[[s,0]])/2.0;
             omega[[s,m]]=0.0; 
         }
 
