@@ -925,14 +925,32 @@ fn spin(
 
     { // scope to allow the freeing of f2n
         let f2n = &mut Array2::<f64>::zeros((LMAX + 1, SDIV)); //dmatrix(1,LMAX+1,1,SDIV);
-        for (n, mut row) in f2n.axis_iter_mut(Axis(0)).enumerate() {
-            for (i, val) in row.iter_mut().enumerate() {
-                if i==0 {
-                    continue;
+        for n in 0 ..= LMAX {
+            for i  in 1 ..= SDIV-1 {
+                f2n[[n,i]] = ((1.0 - s_gp[i])/ s_gp[i]).powi(2 * n as i32);
+                print!("f2n[[{},{}]] = {:0.12e}      ",n,i,f2n[[n,i]]);
+                if n < LMAX {
+                    println!();
                 }
-                *val =  ((1.0 - s_gp[i])/ s_gp[i]).powi(2*(n+ 1) as i32); // here: n+1 = 1..=LMAX+1, C code: n+1: 1..=LMAX+1
+                else {
+                    println!("s_gp[{}] = {:0.12e}",i,s_gp[i]);
+                }
+
             }
         }
+        let xxx: f64 = 9.920882812500e-1;
+        let qqq:f64 = (1.0-xxx)/xxx;
+        println!("(1-0.92)/0.92 = {:0.12e}", qqq);
+        println!("qqq.powi(20) = {:0.12e}",qqq.powi(20_i32));
+        // for (n, mut row) in f2n.axis_iter_mut(Axis(0)).enumerate() {
+        //     for (i, val) in row.iter_mut().enumerate() {
+        //         if i==0 {
+        //             continue;
+        //         }
+        //         *val =  ((1.0 - s_gp[i])/ s_gp[i]).powi(2*(n+ 1) as i32); // here: n+1 = 1..=LMAX+1, C code: n+1: 1..=LMAX+1
+        //     }
+        // }
+        
 
         // The published code has defined SMAX = 0.999, in this case the following code is always executed
         // The code corresponding to SMAX = 1.0 has been removed. It can be reinstated at a later date if required once the rust code is working
@@ -1011,7 +1029,7 @@ fn spin(
         for i in 0 ..= MDIV-1 {  //for(i=1;i<=MDIV;i++)
             p_2n[[i,0]]=legendre(0,mu[i]); // p_2n[i][n+1]=legendre(2*n,mu[i]);
         }
-
+        
         for i in 0 ..= MDIV-1 { // for(i=1;i<=MDIV;i++)
             for n in 0 ..= LMAX - 1 { // for(n=1;n<=LMAX;n++) {
                 p_2n[[i,n]]=legendre(2*n + 2,mu[i]); // 2(n+1) = 2n + 2
@@ -1020,6 +1038,8 @@ fn spin(
         } 
     } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
 
+
+    
 
     let sin_theta = &mut [0_f64;MDIV];
     let theta = &mut [0_f64;MDIV];
@@ -1251,9 +1271,9 @@ fn spin(
 
                         // NOTE: any n values that are not indices must be replaced with (n+1) as f64
 
-                        sum_rho += DM / 3.0 * (p_2n[[m,n+1]] * s_rho[[k,m]]
-                                + 4.0 * p_2n[[m+1,n+1]] * s_rho[[k,m+1]] 
-                                + p_2n[[m+2,n+1]] * s_rho[[k,m+2]]);
+                        sum_rho += DM / 3.0 * (p_2n[[m,n]] * s_rho[[k,m]]
+                                + 4.0 * p_2n[[m+1,n]] * s_rho[[k,m+1]] 
+                                + p_2n[[m+2,n]] * s_rho[[k,m+2]]);
                                 
                         sum_gama += DM / 3.0 * ( ((2.0 * (n+1) as f64 - 1.0) * theta[m]).sin() * s_gama[[k,m]]  // n => (n+1) as f64
                                     + 4.0 * ((2.0 * (n+1) as f64 - 1.0).sin() * theta[m+1]) * s_gama[[k,m+1]]
@@ -1356,7 +1376,7 @@ fn spin(
 
                     for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
 
-                        sum_rho += -e_gsm*p_2n[[m,n+1]]*d2_rho[[s,n+1]]; 
+                        sum_rho += -e_gsm*p_2n[[m,n]]*d2_rho[[s,n+1]]; 
 
                         if m==MDIV {             
                             sum_omega += 0.5*e_rsm*e_gsm*d2_omega[[s,n+1]]; 
