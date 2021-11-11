@@ -1,6 +1,7 @@
 use std::cmp::{min,max};
 use std::convert::TryInto;
 use std::f64::consts::PI;
+use std::process::exit;
 // use approx::{relative_eq, relative_ne};
 use assert_approx_eq::assert_approx_eq;
 use ndarray::{Array2, Array3, Zip, array, prelude::*};
@@ -729,9 +730,9 @@ fn sphere(s_gp: &[f64;SDIV],
 
 #[test]
 fn test_legendre() {
-    let x = [0.2, 0.5, 0.8];
-    let order = [2,6,9];
-    let expected_results = [-0.44, 0.32324, 0.18786];
+    let x = [ 0.1, 0.15, 0.2, 0.5, 0.8]; //
+    let order = [0,1, 2,6,9]; // 
+    let expected_results = [1.0, 0.15, -0.44, 0.32324, 0.18786]; //
 
     for (i,&xval) in x.iter().enumerate(){
         assert_approx_eq!(legendre(order[i], xval),expected_results[i], 0.00001);
@@ -865,13 +866,12 @@ fn test_spin() {
     let a_check = &mut 0;
     let accuracy =1e-5;
     let cf = 1.0;
-    let r_e_new = &mut 0.0;
     let big_omega = &mut 0.0;
     
 
     spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
         enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
-        a_check, accuracy, cf, r_ratio, r_e_new, big_omega);
+        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega);
     println!("Finished");
 
 
@@ -928,29 +928,8 @@ fn spin(
         for n in 0 ..= LMAX {
             for i  in 1 ..= SDIV-1 {
                 f2n[[n,i]] = ((1.0 - s_gp[i])/ s_gp[i]).powi(2 * n as i32);
-                print!("f2n[[{},{}]] = {:0.12e}      ",n,i,f2n[[n,i]]);
-                if n < LMAX {
-                    println!();
-                }
-                else {
-                    println!("s_gp[{}] = {:0.12e}",i,s_gp[i]);
-                }
-
             }
         }
-        let xxx: f64 = 9.920882812500e-1;
-        let qqq:f64 = (1.0-xxx)/xxx;
-        println!("(1-0.92)/0.92 = {:0.12e}", qqq);
-        println!("qqq.powi(20) = {:0.12e}",qqq.powi(20_i32));
-        // for (n, mut row) in f2n.axis_iter_mut(Axis(0)).enumerate() {
-        //     for (i, val) in row.iter_mut().enumerate() {
-        //         if i==0 {
-        //             continue;
-        //         }
-        //         *val =  ((1.0 - s_gp[i])/ s_gp[i]).powi(2*(n+ 1) as i32); // here: n+1 = 1..=LMAX+1, C code: n+1: 1..=LMAX+1
-        //     }
-        // }
-        
 
         // The published code has defined SMAX = 0.999, in this case the following code is always executed
         // The code corresponding to SMAX = 1.0 has been removed. It can be reinstated at a later date if required once the rust code is working
@@ -967,9 +946,31 @@ fn spin(
                     if k<j  {   
                         f_rho[[j,n+1,k]] = f2n[[n+1,j]]*sj1/(sj*f2n[[n+1,k]]*sk1*sk1); // here: n+1 index = 1..=LMAX, C code: n+1 = 2..=LMAX+1
                         f_gama[[j,n+1,k]] = f2n[[n+1,j]]/(f2n[[n+1,k]]*sk*sk1); // here: j,k index = 1..=SDIV-1, C code: j,k = 2..=SDIV
+                        // if j==8 && k==7 && n==6 {
+                        //     println!("(j,n,k)=({},{},{})",j,n,k);
+                        //     println!("f2n[n+1][j] = {:?}", f2n[[n+1,j]]);
+                        //     println!("f2n[n+1][k] = {:?}", f2n[[n+1,k]]);
+                        //     println!("sj1 = {:0.12e}", sj1);
+                        //     println!("sj = {:0.12e}", sj);
+                        //     println!("sk1 = {:0.12e}", sk1);
+                        //     println!("sk = {:0.12e}", sk);
+                        //     println!("f_rho[j][n+1][k] = {:?}", f_rho[[j,n+1,k]]);
+                        //     println!("f_gama[j][n+1][k] = {:?}", f_gama[[j,n+1,k]]);
+                        //  }
                     } else {     
                         f_rho[[j,n+1,k]] = f2n[[n+1,k]]/(f2n[[n+1,j]]*sk*sk1);
                         f_gama[[j,n+1,k]] = f2n[[n+1,k]]*sj1*sj1*sk/(sj*sj*f2n[[n+1,j]]*sk1*sk1*sk1);
+                        // if j==7 && k==8 && n==6 {
+                        //     println!("(j,n,k)=({},{},{})",j,n,k);
+                        //     println!("f2n[n+1][j] = {:?}", f2n[[n+1,j]]);
+                        //     println!("f2n[n+1][k] = {:?}", f2n[[n+1,k]]);
+                        //     println!("sj1 = {:0.12e}", sj1);
+                        //     println!("sj = {:0.12e}", sj);
+                        //     println!("sk1 = {:0.12e}", sk1);
+                        //     println!("sk = {:0.12e}", sk);
+                        //     println!("f_rho[j][n+1][k] = {:?}", f_rho[[j,n+1,k]]);
+                        //     println!("f_gama[j][n+1][k] = {:?}", f_gama[[j,n+1,k]]);
+                        //  }
                     }
                 } // for k
             } // for n
@@ -1032,14 +1033,12 @@ fn spin(
         
         for i in 0 ..= MDIV-1 { // for(i=1;i<=MDIV;i++)
             for n in 0 ..= LMAX - 1 { // for(n=1;n<=LMAX;n++) {
-                p_2n[[i,n]]=legendre(2*n + 2,mu[i]); // 2(n+1) = 2n + 2
-                p1_2n_1[[i,n]] = legendre_poly_lm((2*n +1) as i32 ,1,mu[i]); // 2(n+1) - 1 = 2n + 1
+                p_2n[[i,n+1]]=legendre(2*n + 2,mu[i]); // 2(n+1) = 2n + 2
+                p1_2n_1[[i,n+1]] = legendre_poly_lm((2*n +1) as i32 ,1,mu[i]); // 2(n+1) - 1 = 2n + 1
             }
         } 
     } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
 
-
-    
 
     let sin_theta = &mut [0_f64;MDIV];
     let theta = &mut [0_f64;MDIV];
@@ -1057,6 +1056,9 @@ fn spin(
 
         if print_dif  {
             println!("{:4.3e}",dif); 
+            println!("r_e= {:0.12e}",r_e);
+            println!("n_of_it= {}",n_of_it);
+            // exit(0); 
         }
 
 
@@ -1085,7 +1087,13 @@ fn spin(
             rho_mu_1[s]=rho[[s,MDIV-1]];  
             gama_mu_1[s]=gama[[s,MDIV-1]];
         }
-
+        println!("rho[[7,7]]={:?}",rho[[7,7]]);
+        println!("gama[[7,7]]={:?}",gama[[7,7]]);
+        println!("alpha[[7,7]]={:?}",alpha[[7,7]]);
+        println!("omega[[7,7]]={:?}",omega[[7,7]]);
+        if n_of_it > 2 {
+            exit(0);
+        }
         /* Compute new r_e. */ 
 
         let r_e_old= r_e;
@@ -1103,6 +1111,12 @@ fn spin(
 
         r_e=(2.0*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h)).sqrt();
         let re_sq = 2.0*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h);
+        println!("r_e={:0.12e}",r_e);
+        println!("re_sq={:0.12e}",re_sq);
+        println!("gama_pole_h={:0.12e}",gama_pole_h);
+        println!("rho_pole_h={:0.12e}",rho_pole_h);
+        println!("gama_center_h={:0.12e}",gama_center_h);
+        println!("rho_center_h={:0.12e}",rho_center_h);
 
 
         /* Compute angular velocity big_omega. */
@@ -1179,7 +1193,10 @@ fn spin(
                 alpha[[s,m]] *= re_sq;
             } // for m
         } // for s
-
+        println!("before metric rho[[7,7]]={:0.12e}",rho[[7,7]]);
+        println!("before metric gama[[7,7]]={:0.12e}",gama[[7,7]]);
+        println!("before metric alpha[[7,7]]={:0.12e}",alpha[[7,7]]);
+        println!("before metric omega[[7,7]]={:0.12e}",omega[[7,7]]);
 
         {
 
@@ -1239,6 +1256,10 @@ fn spin(
                 } // for m
             } // for s
 
+            println!("before angular s_gama[[7,7]]={:0.12e}",s_gama[[7,7]]);
+            println!("before angular s_rho[[7,7]]={:0.12e}",s_rho[[7,7]]);
+            println!("before angular s_omega[[7,7]]={:0.12e}",s_omega[[7,7]]);
+
 
 
             /* ANGULAR INTEGRATION */
@@ -1253,9 +1274,17 @@ fn spin(
 
             for k in 0 ..= SDIV-1 { //for(k=1;k<=SDIV;k++) {      
                 for m in (0 ..= MDIV-3).step_by(2) { //for(m=1;m<=MDIV-2;m+=2) {
-                    sum_rho += (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
-                                + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
-                                + p_2n[[m+2,0]] * s_rho[[k,m+2]]);
+                    let delta = (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
+                        + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
+                        + p_2n[[m+2,0]]  * s_rho[[k,m+2]]);
+                    sum_rho += delta;
+                    // if k== 7 {
+                    //     println!("({},{})={:13.9},({},{})={:13.9},({},{})={:13.9}",m,0,p_2n[[m,0]],m+1,0,p_2n[[m+1,0]],m+2,0,p_2n[[m+2,0]]);
+                    //     println!("k=7: sum_rho = {:17.12e} delta = {:17.12e}",sum_rho, delta);
+                    // }
+                    // sum_rho += (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
+                    //             + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
+                    //             + p_2n[[m+2,0]] * s_rho[[k,m+2]]);
                 }
 
                 d1_rho[[0,k]]=sum_rho;
@@ -1264,6 +1293,7 @@ fn spin(
                 sum_rho=0.0;
 
             } // for k
+
 
             for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
                 for k in 0 ..= SDIV-1 { //for(k=1;k<=SDIV;k++) {      
@@ -1296,8 +1326,12 @@ fn spin(
             // free_dmatrix(s_rho,1,SDIV,1,MDIV);
             // free_dmatrix(s_omega,1,SDIV,1,MDIV);
             
-
-
+            // Different here *****************
+            println!("before radial d1_gama[[7,7]]={:0.12e}",d1_gama[[7,7]]);
+            println!("before radial d1_rho[[7,7]]={:0.12e}",d1_rho[[7,7]]);
+            println!("before radial d1_rho[[0,7]]={:0.12e}",d1_rho[[0,7]]);
+            println!("before radial d1_omega[[7,7]]={:0.12e}",d1_omega[[7,7]]);
+            exit(0);
             /* RADIAL INTEGRATION */
 
             let  d2_rho = &mut Array2::<f64>::zeros((SDIV,LMAX+1));  // dmatrix(1,SDIV,1,LMAX+1);
