@@ -296,7 +296,7 @@ fn test_n0_at_e() {
 
 }
 
-fn  n0_at_e(ee : f64, 
+pub fn  n0_at_e(ee : f64, 
     log_n0_tab: &Vec<f64>, 
     log_e_tab: &Vec<f64>,
     opt_nearest: Option<usize>) -> (f64, Option<usize>) {

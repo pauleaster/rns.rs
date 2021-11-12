@@ -2,9 +2,11 @@ pub mod equil;
 pub mod consts;
 mod equil_util;
 
-use crate::consts::{SDIV,MDIV};
+use equil_util::test_spin;
+
+
 
 
 fn main() {
-    println!("Hello, world!, {}, {}",SDIV,MDIV);
+    test_spin();
 }

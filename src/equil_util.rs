@@ -10,7 +10,7 @@ use std::time::Instant;
 
 
 use crate::consts::*;
-use crate::equil::{e_at_p, e_of_rho0, get_e_p_surface, get_min_enthalpy, h_at_p, load_eos, make_center, make_grid, p_at_e, p_at_h, read_eos_file};
+use crate::equil::{e_at_p, e_of_rho0, get_e_p_surface, get_min_enthalpy, h_at_p, load_eos, make_center, make_grid, n0_at_e, p_at_e, p_at_h, read_eos_file};
 
 
 pub enum EosType {
@@ -267,10 +267,23 @@ fn deriv_s(f: &Array2<f64>, s: usize, m: usize) ->  f64 {
 
 fn deriv_m(f: &Array2<f64>, s: usize, m: usize) ->  f64 {
 
+
     match m {
-        0 => (f[[s,m+1]]-f[[s,m]])/DM, // edge case
-        1 ..= MDIV_MIN_2 => (f[[s,m+1]]-f[[s,m-1]])/(2.0*DM), // normal case
-        MDIV_MIN_1  => (f[[s,m]]-f[[s,m-1]])/DM, // edge case        
+        0 => {
+            let ffp1 = f[[s,m+1]];
+            let ff = f[[s,m]];
+            (ffp1-ff)/DM
+            }, // edge case
+        1 ..= MDIV_MIN_2 => {
+            let ffp1 = f[[s,m+1]];
+            let ffm1 = f[[s,m-1]];
+            (ffp1-ffm1)/(2.0*DM)
+                    }, // normal case
+        MDIV_MIN_1  => {
+            let ff = f[[s,m]];
+            let ffm1 = f[[s,m-1]];  
+            (ff-ffm1)/DM
+                }, // edge case        
         _ => panic!("Attempted to take derivative with index out of bounds in deriv_m."),
     }
 }
@@ -517,7 +530,7 @@ fn tov(i_check:  ICheck,
         m += (h/6.0)*(b1+2.*b2+2.*b3+b4);
         p += (h/6.0)*(c1+2.*c2+2.*c3+c4);
 
-        // println!("r,m,p = {:9.8e}, {:9.8e}, {:9.8e}",r,m,p);
+        // println!("r,m,p = {:0.16e}, {:0.16e}, {:0.16e}",r,m,p);
     
         r_is += h;
 
@@ -828,8 +841,8 @@ fn legendre_poly_lm(l: i32, m: i32, x: f64) -> f64 { // renamed from plgndr()
 }
 
 
-#[test]
-fn test_spin() {
+
+pub fn test_spin() {
     let (s,m) = make_grid();
     let (log_e_tab, log_p_tab, log_h_tab, _, _) = load_eos("./eos/eosA").unwrap(); 
     let eos_type = &EosType::Table;
@@ -861,7 +874,7 @@ fn test_spin() {
     sphere(&s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, 
             e_center, p_center, p_surface, e_surface, &mut rho, &mut gama, &mut alpha, &mut omega, &mut r_e);
 
-    let r_ratio = 1.0;
+    let r_ratio = 0.7;
     let enthalpy_min = get_min_enthalpy( eos_type);
     let a_check = &mut 0;
     let accuracy =1e-5;
@@ -872,9 +885,15 @@ fn test_spin() {
     spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
         enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
         a_check, accuracy, cf, r_ratio, &mut r_e, big_omega);
-    println!("Finished");
+
+    println!("Finished, r_e = {:0.16}",r_e);
 
 
+}
+
+#[test]
+fn test_test_spin() {
+    test_spin();
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -904,13 +923,10 @@ fn spin(
     cf: f64,
     r_ratio: f64,
     r_e_new: &mut f64,
-    big_omega: &mut f64
-)
-
-{
+    big_omega: &mut f64) {
 
     let mut n_of_it=0;              /* number of iterations */
-    let print_dif = true;
+    let print_dif = false;
     let mut dif=1.0;             /* difference | r_e_old - r_e | */
     let mut term_in_big_omega_h;
     let mut omega_equator_h;             /* omega^hat at equator */         
@@ -947,13 +963,13 @@ fn spin(
                         f_rho[[j,n+1,k]] = f2n[[n+1,j]]*sj1/(sj*f2n[[n+1,k]]*sk1*sk1); // here: n+1 index = 1..=LMAX, C code: n+1 = 2..=LMAX+1
                         f_gama[[j,n+1,k]] = f2n[[n+1,j]]/(f2n[[n+1,k]]*sk*sk1); // here: j,k index = 1..=SDIV-1, C code: j,k = 2..=SDIV
                         // if j==8 && k==7 && n==6 {
-                        //     println!("(j,n,k)=({},{},{})",j,n,k);
+                        //     // println!("(j,n,k) = ({},{},{})",j,n,k);
                         //     println!("f2n[n+1][j] = {:?}", f2n[[n+1,j]]);
                         //     println!("f2n[n+1][k] = {:?}", f2n[[n+1,k]]);
-                        //     println!("sj1 = {:0.12e}", sj1);
-                        //     println!("sj = {:0.12e}", sj);
-                        //     println!("sk1 = {:0.12e}", sk1);
-                        //     println!("sk = {:0.12e}", sk);
+                        //     println!("sj1 = {:0.16e}", sj1);
+                        //     println!("sj = {:0.16e}", sj);
+                        //     println!("sk1 = {:0.16e}", sk1);
+                        //     println!("sk = {:0.16e}", sk);
                         //     println!("f_rho[j][n+1][k] = {:?}", f_rho[[j,n+1,k]]);
                         //     println!("f_gama[j][n+1][k] = {:?}", f_gama[[j,n+1,k]]);
                         //  }
@@ -961,13 +977,13 @@ fn spin(
                         f_rho[[j,n+1,k]] = f2n[[n+1,k]]/(f2n[[n+1,j]]*sk*sk1);
                         f_gama[[j,n+1,k]] = f2n[[n+1,k]]*sj1*sj1*sk/(sj*sj*f2n[[n+1,j]]*sk1*sk1*sk1);
                         // if j==7 && k==8 && n==6 {
-                        //     println!("(j,n,k)=({},{},{})",j,n,k);
+                        //     // println!("(j,n,k) = ({},{},{})",j,n,k);
                         //     println!("f2n[n+1][j] = {:?}", f2n[[n+1,j]]);
                         //     println!("f2n[n+1][k] = {:?}", f2n[[n+1,k]]);
-                        //     println!("sj1 = {:0.12e}", sj1);
-                        //     println!("sj = {:0.12e}", sj);
-                        //     println!("sk1 = {:0.12e}", sk1);
-                        //     println!("sk = {:0.12e}", sk);
+                        //     println!("sj1 = {:0.16e}", sj1);
+                        //     println!("sj = {:0.16e}", sj);
+                        //     println!("sk1 = {:0.16e}", sk1);
+                        //     println!("sk = {:0.16e}", sk);
                         //     println!("f_rho[j][n+1][k] = {:?}", f_rho[[j,n+1,k]]);
                         //     println!("f_gama[j][n+1][k] = {:?}", f_gama[[j,n+1,k]]);
                         //  }
@@ -1053,13 +1069,19 @@ fn spin(
 
     // main loop
     while dif> accuracy || n_of_it < 2 { 
-
+        // println!("{:?}", dif> accuracy || n_of_it < 2 );
+        // println!("n_of_it = {}",n_of_it);
         if print_dif  {
-            println!("{:4.3e}",dif); 
-            println!("r_e= {:0.12e}",r_e);
-            println!("n_of_it= {}",n_of_it);
+            println!("dif = {:0.16e}",dif); 
+        } 
+        // println!("r_e = {:0.16e}",r_e);
+        // println!("r_e.powi(2) = {:0.16e}",r_e.powi(2));
+        
+        // if n_of_it == 2 {
+        //     exit(0);
+        // }
             // exit(0); 
-        }
+        
 
 
 
@@ -1087,13 +1109,12 @@ fn spin(
             rho_mu_1[s]=rho[[s,MDIV-1]];  
             gama_mu_1[s]=gama[[s,MDIV-1]];
         }
-        println!("rho[[7,7]]={:?}",rho[[7,7]]);
-        println!("gama[[7,7]]={:?}",gama[[7,7]]);
-        println!("alpha[[7,7]]={:?}",alpha[[7,7]]);
-        println!("omega[[7,7]]={:?}",omega[[7,7]]);
-        if n_of_it > 2 {
-            exit(0);
-        }
+        // println!("rho[[7,7]] = {:?}",rho[[7,7]]);
+        // println!("gama[[7,7]] = {:?}",gama[[7,7]]);
+        // // println!("gama[[7,MDIV-1]] = {:?}",gama[[7,MDIV-1]]);
+        // println!("alpha[[7,7]] = {:?}",alpha[[7,7]]);
+        // println!("omega[[7,7]] = {:?}",omega[[7,7]]);
+
         /* Compute new r_e. */ 
 
         let r_e_old= r_e;
@@ -1111,12 +1132,14 @@ fn spin(
 
         r_e=(2.0*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h)).sqrt();
         let re_sq = 2.0*h_center/(gama_pole_h+rho_pole_h-gama_center_h-rho_center_h);
-        println!("r_e={:0.12e}",r_e);
-        println!("re_sq={:0.12e}",re_sq);
-        println!("gama_pole_h={:0.12e}",gama_pole_h);
-        println!("rho_pole_h={:0.12e}",rho_pole_h);
-        println!("gama_center_h={:0.12e}",gama_center_h);
-        println!("rho_center_h={:0.12e}",rho_center_h);
+        // println!("r_e = {:0.16e}",r_e);
+        // println!("r_p = {:0.16e}",r_p);
+        // println!("s_p = {:0.16e}",s_p);
+        // println!("re_sq = {:0.16e}",re_sq);
+        // println!("gama_pole_h = {:0.16e}",gama_pole_h);
+        // println!("rho_pole_h = {:0.16e}",rho_pole_h);
+        // println!("gama_center_h = {:0.16e}",gama_center_h);
+        // println!("rho_center_h = {:0.16e}",rho_center_h);
 
 
         /* Compute angular velocity big_omega. */
@@ -1193,10 +1216,16 @@ fn spin(
                 alpha[[s,m]] *= re_sq;
             } // for m
         } // for s
-        println!("before metric rho[[7,7]]={:0.12e}",rho[[7,7]]);
-        println!("before metric gama[[7,7]]={:0.12e}",gama[[7,7]]);
-        println!("before metric alpha[[7,7]]={:0.12e}",alpha[[7,7]]);
-        println!("before metric omega[[7,7]]={:0.12e}",omega[[7,7]]);
+        // println!("before_metric_rho[[7,7]] = {:0.16e}",rho[[7,7]]);
+        // println!("before_metric_gama[[7,7]] = {:0.16e}",gama[[7,7]]);
+        // // println!("before_metric_gama[[7,MDIV-1]] = {:0.16e}",gama[[7,MDIV-1]]);
+        // println!("before_metric_alpha[[7,7]] = {:0.16e}",alpha[[7,7]]);
+        // println!("before_metric_omega[[7,7]] = {:0.16e}",omega[[7,7]]);
+        // println!("before_metric_velocity_sq[[7,7]] = {:0.16e}",velocity_sq[[7,7]]);
+        // println!("before_metric_enthalpy[[7,7]] = {:0.16e}",enthalpy[[7,7]]);
+        // println!("before_metric_pressure[[7,7]] = {:0.16e}",pressure[[7,7]]);
+        // println!("before_metric_energy[[7,7]] = {:0.16e}",energy[[7,7]]);
+
 
         {
 
@@ -1256,9 +1285,12 @@ fn spin(
                 } // for m
             } // for s
 
-            println!("before angular s_gama[[7,7]]={:0.12e}",s_gama[[7,7]]);
-            println!("before angular s_rho[[7,7]]={:0.12e}",s_rho[[7,7]]);
-            println!("before angular s_omega[[7,7]]={:0.12e}",s_omega[[7,7]]);
+            // println!("before_angular_s_gama[[7,7]] = {:0.16e}",s_gama[[7,7]]);
+            // println!("before_angular_s_rho[[7,7]] = {:0.16e}",s_rho[[7,7]]);
+            // println!("before_angular_s_omega[[7,7]] = {:0.16e}",s_omega[[7,7]]);
+            // println!("before_angular_s_gama[[7,MDIV-1]] = {:0.16e}",s_gama[[7,MDIV-1]]);
+            // println!("before_angular_s_rho[[7,MDIV-1]] = {:0.16e}",s_rho[[7,MDIV-1]]);
+            // println!("before_angular_s_omega[[7,MDIV-1]] = {:0.16e}",s_omega[[7,MDIV-1]]);
 
 
 
@@ -1274,17 +1306,20 @@ fn spin(
 
             for k in 0 ..= SDIV-1 { //for(k=1;k<=SDIV;k++) {      
                 for m in (0 ..= MDIV-3).step_by(2) { //for(m=1;m<=MDIV-2;m+=2) {
-                    let delta = (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
-                        + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
-                        + p_2n[[m+2,0]]  * s_rho[[k,m+2]]);
-                    sum_rho += delta;
+                    // let delta = (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
+                    //     + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
+                    //     + p_2n[[m+2,0]]  * s_rho[[k,m+2]]);
+                    // sum_rho += delta;
                     // if k== 7 {
-                    //     println!("({},{})={:13.9},({},{})={:13.9},({},{})={:13.9}",m,0,p_2n[[m,0]],m+1,0,p_2n[[m+1,0]],m+2,0,p_2n[[m+2,0]]);
-                    //     println!("k=7: sum_rho = {:17.12e} delta = {:17.12e}",sum_rho, delta);
+                    //     println!("({},{})={:0.16e},({},{})={:0.16e},({},{})={:0.16e}",m,0,p_2n[[m,0]],m+1,0,p_2n[[m+1,0]],m+2,0,p_2n[[m+2,0]]);
+                    //     println!("k = 7: sum_rho = {:0.16e} delta = {:0.16e}",sum_rho, delta);
+                    //     if m >= 2 {
+                    //         exit(0);
+                    //     }
                     // }
-                    // sum_rho += (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
-                    //             + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
-                    //             + p_2n[[m+2,0]] * s_rho[[k,m+2]]);
+                    sum_rho += (DM/3.0) * (p_2n[[m,0]] * s_rho[[k,m]]
+                                + 4.0 * p_2n[[m+1,0]] * s_rho[[k,m+1]] 
+                                + p_2n[[m+2,0]] * s_rho[[k,m+2]]);
                 }
 
                 d1_rho[[0,k]]=sum_rho;
@@ -1297,21 +1332,25 @@ fn spin(
 
             for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
                 for k in 0 ..= SDIV-1 { //for(k=1;k<=SDIV;k++) {      
-                    for m in 0 ..= MDIV-3 { // for(m=1;m<=MDIV-2;m+=2) {
+                    for m in (0 ..= MDIV-3).step_by(2) { // for(m=1;m<=MDIV-2;m+=2) {
 
                         // NOTE: any n values that are not indices must be replaced with (n+1) as f64
+                        sum_rho += DM / 3.0 * (p_2n[[m,n+1]] * s_rho[[k,m]]
+                            + 4.0 * p_2n[[m+1,n+1]] * s_rho[[k,m+1]] 
+                            + p_2n[[m+2,n+1]] * s_rho[[k,m+2]]);
 
-                        sum_rho += DM / 3.0 * (p_2n[[m,n]] * s_rho[[k,m]]
-                                + 4.0 * p_2n[[m+1,n]] * s_rho[[k,m+1]] 
-                                + p_2n[[m+2,n]] * s_rho[[k,m+2]]);
+                        // sum_rho += DM / 3.0 * (p_2n[[m,n+1]] * s_rho[[k,m]]
+                        //         + 4.0 * p_2n[[m+1,n+1]] * s_rho[[k,m+1]] 
+                        //         + p_2n[[m+2,n+1]] * s_rho[[k,m+2]]);
                                 
                         sum_gama += DM / 3.0 * ( ((2.0 * (n+1) as f64 - 1.0) * theta[m]).sin() * s_gama[[k,m]]  // n => (n+1) as f64
-                                    + 4.0 * ((2.0 * (n+1) as f64 - 1.0).sin() * theta[m+1]) * s_gama[[k,m+1]]
-                                    + ((2.0 * (n+1) as f64 - 1.0) * theta[m+2]).sin() * s_gama[[k,m+2]]);
+                        + 4.0 * ((2.0 * (n+1) as f64 - 1.0) * theta[m+1]).sin() * s_gama[[k,m+1]]
+                        + ((2.0 * (n+1) as f64 - 1.0) * theta[m+2]).sin() * s_gama[[k,m+2]]);
 
-                        sum_omega += DM / 3.0 * (sin_theta[m] * p1_2n_1[[m,n+1]] * s_omega[[k,m]]
-                                    +4.0 * sin_theta[m+1] * p1_2n_1[[m+1,n+1]] * s_omega[[k,m+1]]
-                                    +sin_theta[m+2] * p1_2n_1[[m+2,n+1]] * s_omega[[k,m+2]]);
+                        let dom = DM / 3.0 * (sin_theta[m] * p1_2n_1[[m,n+1]] * s_omega[[k,m]]
+                            +4.0 * sin_theta[m+1] * p1_2n_1[[m+1,n+1]] * s_omega[[k,m+1]]
+                            +sin_theta[m+2] * p1_2n_1[[m+2,n+1]] * s_omega[[k,m+2]]);
+                        sum_omega += dom;
                     } // for m
                     d1_rho[[n+1,k]]=sum_rho;
                     d1_gama[[n+1,k]]=sum_gama;
@@ -1322,16 +1361,17 @@ fn spin(
                 } // for k
             } // for n
 
+            
             // free_dmatrix(s_gama,1,SDIV,1,MDIV);
             // free_dmatrix(s_rho,1,SDIV,1,MDIV);
             // free_dmatrix(s_omega,1,SDIV,1,MDIV);
             
-            // Different here *****************
-            println!("before radial d1_gama[[7,7]]={:0.12e}",d1_gama[[7,7]]);
-            println!("before radial d1_rho[[7,7]]={:0.12e}",d1_rho[[7,7]]);
-            println!("before radial d1_rho[[0,7]]={:0.12e}",d1_rho[[0,7]]);
-            println!("before radial d1_omega[[7,7]]={:0.12e}",d1_omega[[7,7]]);
-            exit(0);
+
+            // println!("before_radial_d1_gama[[7,7]] = {:0.16e}",d1_gama[[7,7]]);
+            // println!("before_radial_d1_rho[[7,7]] = {:0.16e}",d1_rho[[7,7]]);
+            // println!("before_radial_d1_rho[[0,7]] = {:0.16e}",d1_rho[[0,7]]);
+            // println!("before_radial_d1_omega[[7,7]] = {:0.16e}",d1_omega[[7,7]]);
+
             /* RADIAL INTEGRATION */
 
             let  d2_rho = &mut Array2::<f64>::zeros((SDIV,LMAX+1));  // dmatrix(1,SDIV,1,LMAX+1);
@@ -1389,6 +1429,8 @@ fn spin(
                 } // for n
             } // for s
 
+            
+
             // free_dmatrix(d1_rho,1,LMAX+1,1,SDIV);
             // free_dmatrix(d1_gama,1,LMAX+1,1,SDIV);
             // free_dmatrix(d1_omega,1,LMAX+1,1,SDIV);
@@ -1398,6 +1440,10 @@ fn spin(
 
             for s in 0 ..= SDIV-1 { //for(s=1;s<=SDIV;s++) 
                 for m in 0 ..= MDIV-1 { // for(m=1;m<=MDIV;m++) {
+
+                    // if m >= 63 {
+                    //     println!("Break here!, m={} ",m);
+                    // }
 
                     let gsm=gama[[s,m]];
                     let rsm=rho[[s,m]];
@@ -1410,9 +1456,9 @@ fn spin(
 
                     for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
 
-                        sum_rho += -e_gsm*p_2n[[m,n]]*d2_rho[[s,n+1]]; 
+                        sum_rho += -e_gsm*p_2n[[m,n+1]]*d2_rho[[s,n+1]]; 
 
-                        if m==MDIV {             
+                        if m==MDIV-1 {             
                             sum_omega += 0.5*e_rsm*e_gsm*d2_omega[[s,n+1]]; 
                             sum_gama += -(2.0/PI)*e_gsm*d2_gama[[s,n+1]];   
                         }
@@ -1435,8 +1481,18 @@ fn spin(
                 } // for m
             } // for s
 
+            // println!("before_divergence_d2_gama[[7,7]] = {:0.16e}",d2_gama[[7,7]]);
+            // println!("before_divergence_d2_rho[[7,7]] = {:0.16e}",d2_rho[[7,7]]);
+            // println!("before_divergence_d2_rho[[0,7]] = {:0.16e}",d2_rho[[0,7]]);
+            // println!("before_divergence_d2_omega[[7,7]] = {:0.16e}",d2_omega[[7,7]]);
+
         } // free up s_xxx, d1_xxx, and d2_xxx arrays 
 
+        // println!("before_divergence_gama[[7,7]] = {:0.16e}",gama[[7,7]]);
+        // println!("before_divergence_rho[[7,7]] = {:0.16e}",rho[[7,7]]);
+        // println!("before_divergence_rho[[0,7]] = {:0.16e}",rho[[0,7]]);
+        // println!("before_divergence_omega[[7,7]] = {:0.16e}",omega[[7,7]]);
+        // println!("before_divergence_gama[[7,MDIV-1]] = {:0.16e}",gama[[7,MDIV-1]]);
 
         /* CHECK FOR DIVERGENCE */
 
@@ -1480,11 +1536,15 @@ fn spin(
 
             for s in 0 ..= SDIV-1 { // for(s=1;s<=SDIV;s++)
                 for m in 0 ..= MDIV-1 { // (m=1;m<=MDIV;m++) {
-                    dgds[[s,m]]=deriv_s(gama,s,m);
-                    dgdm[[s,m]]=deriv_m(gama,s,m);
+
+                    let ds = deriv_s(gama,s,m);
+                    let dm = deriv_m(gama,s,m);
+                    dgds[[s,m]]=ds;
+                    dgdm[[s,m]]=dm;
                 }
             }
-
+            // println!("before_alpha_dgds[[7,7]] = {:0.16e}",dgds[[7,7]]);
+            // println!("before_alpha_dgdm[[7,7]] = {:0.16e}",dgdm[[7,7]]);
 
             /* ALPHA */
 
@@ -1497,7 +1557,6 @@ fn spin(
             } else { 
                 for s in 1 ..= SDIV-1 { // for(s=2;s<=SDIV;s++) {
                     for m in 0 ..= MDIV-1 { // for(m=1;m<=MDIV;m++) {
-
                         da_dm[[0,m]]=0.0; 
                 
                         let sgp=s_gp[s];
@@ -1536,9 +1595,15 @@ fn spin(
 
                         let temp8=m1 * (-2.0 * rho[[s,m]]).exp();
 
-                        da_dm[[s,m]] = -0.5*(d_rho_m+d_gama_m) - temp2*(0.5*(temp3 - 
+                        let dadm = -0.5*(d_rho_m+d_gama_m) - temp2*(0.5*(temp3 - 
                             d_gama_mm - temp4)*(-mum+m1*d_gama_m) + 0.25*temp5 
-                            - temp6 +temp7 + 0.25*temp8*temp1);	 
+                            - temp6 +temp7 + 0.25*temp8*temp1);	
+                        
+                        da_dm[[s,m]] = dadm;
+                        // if dadm.is_nan() {
+                        //     println!("Nan found in da_dm! s={}, m={}",s,m);
+                        //     }
+
                     } // for m
                 } // for s
             } // else not r_ratio approx 1.0
@@ -1546,11 +1611,22 @@ fn spin(
             for s in 0 ..= SDIV-1 { // for(s=1;s<=SDIV;s++) {
                 alpha[[s,0]]=0.0;
                 for m in 0 ..= MDIV-2 { // for(m=1;m<=MDIV-1;m++) {
-                    alpha[[s,m+1]]=alpha[[s,m]]+0.5*DM*(da_dm[[s,m+1]]+
-                                    da_dm[[s,m]]);
+                    let b = alpha[[s,m]];
+                    let c = 0.5*DM*(da_dm[[s,m+1]]+da_dm[[s,m]]);
+                    let a = b + c;
+                    alpha[[s,m+1]] = a;                    
                     }
             }
+            // for i in 0 ..= 8 {
+            //     println!("before_free_alpha[[{},{}]] = {:0.16e}",i,i,alpha[[i,i]]);
+            // }
         }
+        // for i in 0 ..= 8 {
+        //     println!("after_free_alpha[[{},{}]] = {:0.16e}",i,i,alpha[[i,i]]);
+        // }
+        // for i in MDIV-3 ..= MDIV-1 {
+        //     println!("after_free_alpha[[7,{}]] = {:0.16e}",i,alpha[[7,i]]);
+        // }
 
 
     //  free_dmatrix(da_dm,1,SDIV,1,MDIV);
@@ -1569,6 +1645,9 @@ fn spin(
             omega[[s,m]] /= r_e;
             } 
         }
+        // for i in 0 ..= 8 {
+        //     println!("before_end_alpha[[{},{}]] = {:0.16e}",i,i,alpha[[i,i]]);
+        // }
 
         if approx::abs_diff_eq!(SMAX,1.0) {
             for m in 0 ..= MDIV-1 { // for(m=1;m<=MDIV;m++)      
@@ -1582,7 +1661,12 @@ fn spin(
 
         dif=(r_e_old-r_e).abs()/r_e;
         n_of_it += 1;
-
+        // exit(0);
+        // println!("end check {:?}", dif> accuracy || n_of_it < 2 );
+        // println!("end (dif>accuracy) = {:?}", dif> accuracy);
+        // println!("dif = {:0.16}\naccuracy = {:0.16}", dif, accuracy );
+        // println!("r_e_old = {:0.16}\nr_e = {:0.16}", r_e_old, r_e );
+        
     }   /* end while */
 
 
@@ -1598,6 +1682,7 @@ fn spin(
     /* UPDATE r_e_new */
 
     *r_e_new = r_e;
+    // println!("\n\n\nr_e={:0.16}\n",r_e);
 
 
 //   free_f3tensor(f_rho, 1,SDIV,1,LMAX+1,1,SDIV);
@@ -1609,21 +1694,294 @@ fn spin(
 
 
 
-// fn mass_radius(
-//     s_gp: &[f64],
-//     gama: Array2<f64>,
-//     r_ratio : f64,
-//     r_e: f64,
-// ) {
-//     let r_p = r_ratio * r_e;
-//     let s_p = r_p/(r_p+r_e);
-//     let s_e = 0.5;
-//     let rho_0:Array2<f64> = Array2::zeros((SDIV, MDIV));
-//     let velocity:Array2<f64> = Array2::zeros((SDIV, MDIV));
+/***********************************************************************/
+/* Computes the gravitational mass, equatorial radius, angular momentum
+ *	of the star
+ * 	and the velocity of co- and counter-rotating particles      
+ *	with respect to a ZAMO                                         */
+/***********************************************************************/
+fn mass_radius(
+    s_gp : &[f64],
+    mu: &[f64],
+    opt_log_e_tab: &Option<Vec<f64>>, 
+    opt_log_p_tab: &Option<Vec<f64>>, 
+    opt_log_h_tab: &Option<Vec<f64>>, 
+    opt_log_n0_tab: &Option<Vec<f64>>,                  
+    eos_type: &EosType,
+    opt_gamma_p: &Option <f64>, 
+    rho: &mut Array2<f64>,
+    gama: &mut Array2<f64>,
+    alpha: &mut Array2<f64>,
+    omega: &mut Array2<f64>,
+    energy: &mut Array2<f64>,
+    pressure: &mut Array2<f64>,
+    enthalpy: &mut Array2<f64>,
+    velocity_sq: &mut Array2<f64>,
+    r_ratio: f64,
+    e_surface: f64,
+    r_e: f64,
+    big_omega: f64,
+    mass: &mut f64, 
+    mass_0: &mut f64,
+    ang_mom: &mut f64,
+    rr_e: &mut f64,
+    v_plus: &mut f64,
+    v_minus: &mut f64,
+    omega_k: &mut f64) {
+// int s,
+// m,
+// n_nearest;
 
-//     let gama_mu_0 = gamma
-//     // let gama_mu_0:Vec<f64> = vec![0.0;SDIV];   
 
-//     let gama_equator = interp(s_gp, gama, s_e, None);
+// double   
+// gama_equator,              /* gama at equator */
+// rho_equator,               /* rho at equator */
+// omega_equator,             /* omega at equator */
+// s1,
+// s_1,
+// d_gama_s,
+// d_rho_s,
+// d_omega_s,
+// sqrt_v,
+// s_e,                 
+// doe,
+// dge, 
+// dre,
+// dve,
+// vek,     
+// J,
+// r_p,
+// s_p;                 
+
+
+
+    let d_m= &mut [0.0_f64;SDIV];  /* int. quantity for M */
+    let d_m_0= &mut [0.0_f64;SDIV]; /* int. quantity for M_0 */ 
+    let d_j= &mut [0.0_f64;SDIV];   /* int. quantity for J */
+
+    let d_o_e= &mut [0.0_f64;SDIV]; 
+    let d_g_e= &mut [0.0_f64;SDIV]; 
+    let d_r_e= &mut [0.0_f64;SDIV]; 
+    let d_v_e= &mut [0.0_f64;SDIV]; 
+
+    let rho_mu_0= &mut [0.0_f64;SDIV];     
+    let gama_mu_0= &mut [0.0_f64;SDIV];   
+    let omega_mu_0= &mut [0.0_f64;SDIV];  
+
+
     
-// }
+    let r_p= r_ratio*r_e;                              /* radius at pole */
+    let s_p= r_p/(r_p+r_e);                            /* s-coordinate at pole */
+    let s_e=0.5;
+
+    let rho_0 =  &mut Array2::<f64>::zeros((SDIV, MDIV));   // dmatrix(1,SDIV,1,MDIV); /*rest mass density*/
+    let velocity = &mut Array2::<f64>::zeros((SDIV, MDIV));   // dmatrix(1,SDIV,1,MDIV);
+
+    for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) {               
+        gama_mu_0[s]=gama[[s,0]];                   
+        rho_mu_0[s]=rho[[s,0]];                                                    
+    }
+
+    let opt_nearest= Some(SDIV >> 1);
+    let (gama_equator,opt_nearest) =interp(s_gp,gama_mu_0,s_e, opt_nearest);  
+    let (rho_equator,opt_nearest) =interp(s_gp,rho_mu_0,s_e, opt_nearest);   
+
+
+    /* Circumferential radius */
+    *rr_e = match eos_type {
+        EosType::Table => KAPPA.sqrt()*r_e*((gama_equator-rho_equator)/2.0).exp(),
+        EosType::Polytropic => r_e*((gama_equator-rho_equator)/2.0).exp(),
+    };
+
+
+    /* Masses and angular momentum */
+
+    *mass = 0.0;              /* initialize */
+    *mass_0 = 0.0;
+    let mut j=0.0;
+
+    /* CALCULATE THE REST MASS DENSITY */
+    
+    match eos_type {
+        EosType::Table => {
+            let opt_nearest= Some(SDIV >> 1); 
+            for s in 0 ..= SDIV - 1 { // (s=1;s<=SDIV;s++) {  
+                for m in 0 ..= MDIV-1 { //(m=1;m<=MDIV;m++) {
+                    if energy[[s,m]] > e_surface  {
+                        rho_0[[s,m]] = n0_at_e(energy[[s,m]], &opt_log_n0_tab.unwrap(), 
+                                &opt_log_e_tab.unwrap(), opt_nearest).0 * MB * KSCALE * CC * CC; 
+                    }
+                    else {
+                        rho_0[[s,m]]=0.0;
+                    }
+                }  
+            }
+        },
+        EosType::Polytropic =>  {
+            for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) {
+                for m in 0 ..= MDIV-1 { // (m=1;m<=MDIV;m++) {
+                    rho_0[[s,m]]=(energy[[s,m]]+pressure[[s,m]]) * (-enthalpy[[s,m]]).exp(); 
+                }
+            }
+        },
+    }
+
+    
+
+    for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) {
+        d_m[s]=0.0;           /* initialize */
+        d_m_0[s]=0.0;
+        d_j[s]=0.0;
+
+
+    for m in (0 ..= MDIV-3).step_by(2) { // (m=1;m<=MDIV-2;m+=2) {
+        d_m[s] += (1.0/(3.0 * (MDIV-1) as f64)) * ( (2.0 * alpha[[s,m]] + gama[[s,m]]).exp() *
+                (((energy[[s,m]] + pressure[[s,m]]) / (1.0 - velocity_sq[[s,m]])) *
+                (1.0 + velocity_sq[[s,m]] + (2.0 * s_gp[s] * (velocity_sq[[s,m]]).sqrt()/
+                (1.0 - s_gp[s])) * (1.0-mu[m]*mu[m]).sqrt() * r_e * omega[[s,m]] *
+                (-rho[[s,m]]).exp()) + 2.0 * pressure[[s,m]])
+
+            + 4.0 * (2.0 * alpha[[s,m+1]] + gama[[s,m+1]]).exp() *
+                (((energy[[s,m+1]] + pressure[[s,m+1]]) / (1.0 - velocity_sq[[s,m+1]])) *
+                (1.0 + velocity_sq[[s,m+1]] + (2.0*s_gp[s] * (velocity_sq[[s,m+1]]).sqrt() /
+                (1.0 - s_gp[s])) * (1.0-mu[m+1]*mu[m+1]).sqrt() * r_e*omega[[s,m+1]] *
+                (-rho[[s,m+1]]).exp()) + 2.0 * pressure[[s,m+1]]) 
+
+            + (2.0*alpha[[s,m+2]] + gama[[s,m+2]]).exp() *
+                (((energy[[s,m+2]] + pressure[[s,m+2]]) / (1.0 - velocity_sq[[s,m+2]])) *
+                (1.0 + velocity_sq[[s,m+2]] +( 2.0 * s_gp[s] *(velocity_sq[[s,m+2]]).sqrt() /
+                (1.0 - s_gp[s])) * (1.0-mu[m+2] * mu[m+2]).sqrt() * r_e * omega[[s,m+2]] *
+                (-rho[[s,m+2]]).exp()) + 2.0*pressure[[s,m+2]]));    
+
+        d_m_0[s] += (1.0/(3.0 * (MDIV-1) as f64))*( (2.0 * alpha[[s,m]] + (gama[[s,m]]
+                - rho[[s,m]]) / 2.0).exp() * rho_0[[s,m]] / (1.0-velocity_sq[[s,m]]).sqrt()
+
+                + 4.0 * (2.0 * alpha[[s,m+1]]+(gama[[s,m+1]]
+                - rho[[s,m+1]]) / 2.0).exp() * rho_0[[s,m+1]] / (1.0-velocity_sq[[s,m+1]]).sqrt()
+            
+                + (2.0 * alpha[[s,m+2]] + (gama[[s,m+2]]
+                - rho[[s,m+2]]) / 2.0).exp() * rho_0[[s,m+2]] / (1.0-velocity_sq[[s,m+2]]).sqrt());
+
+
+        d_j[s] += (1.0/(3.0 * (MDIV-1) as f64)) * ( (1.0-mu[m]*mu[m]).sqrt() *
+                (2.0 * alpha[[s,m]] + gama[[s,m]] - rho[[s,m]]).exp() * (energy[[s,m]]
+                + pressure[[s,m]]) * (velocity_sq[[s,m]]).sqrt() / (1.0 - velocity_sq[[s,m]])
+
+                + 4.0 * (1.0 - mu[m+1] * mu[m+1]).sqrt() *
+                (2.0 * alpha[[s,m+1]] + gama[[s,m+1]] - rho[[s,m+1]]).exp() * (energy[[s,m+1]]
+                + pressure[[s,m+1]]) * (velocity_sq[[s,m+1]]).sqrt() /
+                (1.0 - velocity_sq[[s,m+1]])
+
+                + (1.0 - mu[m+2] * mu[m+2]).sqrt() *
+                (2.0 * alpha[[s,m+2]] + gama[[s,m+2]] - rho[[s,m+2]]).exp() * (energy[[s,m+2]]
+                + pressure[[s,m+2]]) * (velocity_sq[[s,m+2]]).sqrt() /
+                (1.0 - velocity_sq[[s,m+2]]));
+        }
+    }
+
+    for s in (0 ..= SDIV-3).step_by(2) { //} (s=1;s<=SDIV-2;s+=2) { 
+        *mass += (SMAX/(3.0*(SDIV-1) as f64))*(((s_gp[s]).sqrt()/(1.0-s_gp[s])).powi(4) *
+            d_m[s]+4.0* ((s_gp[s+1]).sqrt()/(1.0-s_gp[s+1])).powi(4) *d_m[s+1]
+            + ((s_gp[s+2]).sqrt()/(1.0-s_gp[s+2])).powi(4) *d_m[s+2]);
+
+        *mass_0 += (SMAX/(3.0*(SDIV-1) as f64))*(    ((s_gp[s]).sqrt()/(1.0-s_gp[s])).powi(4)      *
+            d_m_0[s]+4.0*  ((s_gp[s+1]).sqrt()/(1.0-s_gp[s+1])).powi(4) *d_m_0[s+1]
+            +   ((s_gp[s+2]).sqrt()/(1.0-s_gp[s+2])).powi(4)  *d_m_0[s+2]);
+
+        j += (SMAX/(3.0*(SDIV-1) as f64))*((   (s_gp[s]).powi(3)  / (1.0-s_gp[s]).powi(5)  )*
+            d_j[s]+ 4.0*(   (s_gp[s+1]).powi(3) /   (1.0-s_gp[s+1]).powi(5))*
+            d_j[s+1] + (   (s_gp[s+2]).powi(3) /  (1.0-s_gp[s+2]).powi(5) )*
+            d_j[s+2]);
+
+    }
+
+    if(strcmp(eos_type,"tab")==0) {
+        (*Mass) *= 4*PI*sqrt(KAPPA)*C*C*pow(r_e,3.0)/G;
+        (*Mass_0) *= 4*PI*sqrt(KAPPA)*C*C*pow(r_e,3.0)/G;
+    }
+    else {
+        (*Mass) *= 4*PI*pow(r_e,3.0);
+        (*Mass_0) *= 4*PI*pow(r_e,3.0);
+    }
+
+    if(r_ratio==1.0) 
+        J=0.0; 
+    else {    
+        if(strcmp(eos_type,"tab")==0) 
+            J *= 4*PI*KAPPA*C*C*C*pow(r_e,4.0)/G;
+        else 
+            J *= 4*PI*pow(r_e,4.0);
+    }
+
+    (*ang_mom) = J;
+
+
+/* Compute the velocities of co-rotating and counter-rotating particles
+with respect to a ZAMO 	*/
+
+for(s=1+(SDIV-1)/2;s<=SDIV;s++) {
+s1= s_gp[s]*(1.0-s_gp[s]);
+s_1=1.0-s_gp[s];
+   
+d_gama_s=deriv_s(gama,s,1);
+d_rho_s=deriv_s(rho,s,1);
+d_omega_s=deriv_s(omega,s,1);
+
+sqrt_v= exp(-2.0*rho[[s,1]])*r_e*r_e*pow(s_gp[s],4.0)*pow(d_omega_s,2.0) 
+       + 2*s1*(d_gama_s+d_rho_s)+s1*s1*(d_gama_s*d_gama_s-d_rho_s*d_rho_s);
+
+if(sqrt_v>0.0) sqrt_v= sqrt(sqrt_v);
+else {
+ sqrt_v=0.0;
+}
+
+v_plus[s]=(exp(-rho[[s,1]])*r_e*s_gp[s]*s_gp[s]*d_omega_s + sqrt_v)/
+         (2.0+s1*(d_gama_s-d_rho_s));
+
+v_minus[s]=(exp(-rho[[s,1]])*r_e*s_gp[s]*s_gp[s]*d_omega_s - sqrt_v)/
+          (2.0+s1*(d_gama_s-d_rho_s));
+}
+
+
+/* Kepler angular velocity */
+
+for(s=1;s<=SDIV;s++) { 
+d_o_e[s]=deriv_s(omega,s,1);
+d_g_e[s]=deriv_s(gama,s,1);
+d_r_e[s]=deriv_s(rho,s,1);
+d_v_e[s]=deriv_s(velocity,s,1);
+/* Value of omega on the equatorial plane*/
+omega_mu_0[s] = omega[[s,1]];
+}
+
+n_nearest=SDIV/2; 
+doe=interp(s_gp,d_o_e,SDIV,s_e, &n_nearest);
+dge=interp(s_gp,d_g_e,SDIV,s_e, &n_nearest);
+dre=interp(s_gp,d_r_e,SDIV,s_e, &n_nearest);
+dve=interp(s_gp,d_v_e,SDIV,s_e, &n_nearest);
+
+vek=(doe/(8.0+dge-dre))*r_e*exp(-rho_equator) + sqrt(((dge+dre)/(8.0+dge
+   -dre)) + pow((doe/(8.0+dge-dre))*r_e*exp(-rho_equator),2.0));
+
+
+if (r_ratio ==1.0)
+omega_equator = 0.0;
+else
+omega_equator = interp(s_gp,omega_mu_0,SDIV,s_e, &n_nearest);
+
+
+
+if(strcmp(eos_type,"tab")==0) 
+(*Omega_K) = (C/sqrt(KAPPA))*(omega_equator+vek*exp(rho_equator)/r_e);
+else 
+(*Omega_K) = omega_equator + vek*exp(rho_equator)/r_e;
+
+
+free_dmatrix(velocity,1,SDIV,1,MDIV);
+free_dmatrix(rho_0,1,SDIV,1,MDIV);
+
+
+
+
+
+}
