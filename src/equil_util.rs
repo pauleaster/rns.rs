@@ -1693,7 +1693,7 @@ fn spin(
 } // spin()
 
 
-
+#[allow(clippy::too_many_arguments)]
 /***********************************************************************/
 /* Computes the gravitational mass, equatorial radius, angular momentum
  *	of the star
@@ -1704,11 +1704,11 @@ fn mass_radius(
     s_gp : &[f64],
     mu: &[f64],
     opt_log_e_tab: &Option<Vec<f64>>, 
-    opt_log_p_tab: &Option<Vec<f64>>, 
-    opt_log_h_tab: &Option<Vec<f64>>, 
+    // opt_log_p_tab: &Option<Vec<f64>>, 
+    // opt_log_h_tab: &Option<Vec<f64>>, 
     opt_log_n0_tab: &Option<Vec<f64>>,                  
     eos_type: &EosType,
-    opt_gamma_p: &Option <f64>, 
+    // opt_gamma_p: &Option <f64>, 
     rho: &mut Array2<f64>,
     gama: &mut Array2<f64>,
     alpha: &mut Array2<f64>,
@@ -1720,13 +1720,13 @@ fn mass_radius(
     r_ratio: f64,
     e_surface: f64,
     r_e: f64,
-    big_omega: f64,
+    // big_omega: f64,
     mass: &mut f64, 
     mass_0: &mut f64,
     ang_mom: &mut f64,
     rr_e: &mut f64,
-    v_plus: &mut f64,
-    v_minus: &mut f64,
+    v_plus: &mut [f64],
+    v_minus: &mut [f64],
     omega_k: &mut f64) {
 // int s,
 // m,
@@ -1770,8 +1770,8 @@ fn mass_radius(
 
 
     
-    let r_p= r_ratio*r_e;                              /* radius at pole */
-    let s_p= r_p/(r_p+r_e);                            /* s-coordinate at pole */
+    // let r_p= r_ratio*r_e;  // unused                 /* radius at pole */
+    // let s_p= r_p/(r_p+r_e);  // unused             /* s-coordinate at pole */
     let s_e=0.5;
 
     let rho_0 =  &mut Array2::<f64>::zeros((SDIV, MDIV));   // dmatrix(1,SDIV,1,MDIV); /*rest mass density*/
@@ -1784,7 +1784,7 @@ fn mass_radius(
 
     let opt_nearest= Some(SDIV >> 1);
     let (gama_equator,opt_nearest) =interp(s_gp,gama_mu_0,s_e, opt_nearest);  
-    let (rho_equator,opt_nearest) =interp(s_gp,rho_mu_0,s_e, opt_nearest);   
+    let (rho_equator, _) =interp(s_gp,rho_mu_0,s_e, opt_nearest);   
 
 
     /* Circumferential radius */
@@ -1808,8 +1808,8 @@ fn mass_radius(
             for s in 0 ..= SDIV - 1 { // (s=1;s<=SDIV;s++) {  
                 for m in 0 ..= MDIV-1 { //(m=1;m<=MDIV;m++) {
                     if energy[[s,m]] > e_surface  {
-                        rho_0[[s,m]] = n0_at_e(energy[[s,m]], &opt_log_n0_tab.unwrap(), 
-                                &opt_log_e_tab.unwrap(), opt_nearest).0 * MB * KSCALE * CC * CC; 
+                        rho_0[[s,m]] = n0_at_e(energy[[s,m]], opt_log_n0_tab.as_ref().unwrap(), 
+                                opt_log_e_tab.as_ref().unwrap(), opt_nearest).0 * MB * KSCALE * CC * CC; 
                     }
                     else {
                         rho_0[[s,m]]=0.0;
@@ -1894,94 +1894,98 @@ fn mass_radius(
             d_j[s+2]);
 
     }
+    
+    *mass = 4.0 * PI * r_e.powi(3);;
+    if matches!(eos_type, EosType::Table) {
+        *mass *= KAPPA.sqrt() * CC * CC / GG;
+    };
 
-    if(strcmp(eos_type,"tab")==0) {
-        (*Mass) *= 4*PI*sqrt(KAPPA)*C*C*pow(r_e,3.0)/G;
-        (*Mass_0) *= 4*PI*sqrt(KAPPA)*C*C*pow(r_e,3.0)/G;
+    *mass_0 = *mass; 
+
+    if approx::abs_diff_eq!(r_ratio, 1.0) {    
+        j = 0.0; 
     }
     else {
-        (*Mass) *= 4*PI*pow(r_e,3.0);
-        (*Mass_0) *= 4*PI*pow(r_e,3.0);
+        j *= 4.0 * PI * r_e.powi(4);
+        if matches!(eos_type, EosType::Table) {
+            j *= KAPPA * CC * CC * CC / GG;
+        };
+
     }
 
-    if(r_ratio==1.0) 
-        J=0.0; 
-    else {    
-        if(strcmp(eos_type,"tab")==0) 
-            J *= 4*PI*KAPPA*C*C*C*pow(r_e,4.0)/G;
-        else 
-            J *= 4*PI*pow(r_e,4.0);
+    *ang_mom = j;
+
+
+    /* Compute the velocities of co-rotating and counter-rotating particles
+    with respect to a ZAMO 	*/
+
+    for s in SDIV_MIN_1 >> 1 ..= SDIV-1 {  // (s=1+(SDIV-1)/2;s<=SDIV;s++) {
+        let s1= s_gp[s]*(1.0-s_gp[s]);
+        // let s_1=1.0-s_gp[s]; // unused
+        
+        let d_gama_s=deriv_s(gama,s,1);
+        let d_rho_s=deriv_s(rho,s,1);
+        let d_omega_s=deriv_s(omega,s,1);
+        let exp_min_2_rho_s0 = (-2.0*rho[[s,0]]).exp();
+        let exp_min_rho_s0 = (-rho[[s,0]]).exp();
+        let s_gp_sqr = s_gp[s] * s_gp[s];
+        let s_gp_4 = s_gp_sqr * s_gp_sqr;
+
+        let  v = exp_min_2_rho_s0 * r_e * r_e * s_gp_4   * d_omega_s.powi(2)
+            + 2.0 *s1*(d_gama_s+d_rho_s)+s1*s1*(d_gama_s*d_gama_s-d_rho_s*d_rho_s);
+
+        let sqrt_v = match v > 0.0 {
+            true => v.sqrt(),
+            false => 0.0,
+        };
+        
+
+        v_plus[s]=(exp_min_rho_s0 * r_e * s_gp_sqr * d_omega_s + sqrt_v)/
+                (2.0 + s1 * (d_gama_s - d_rho_s));
+
+        v_minus[s]=(exp_min_rho_s0 * r_e * s_gp_sqr * d_omega_s - sqrt_v)/
+                (2.0 + s1 * (d_gama_s - d_rho_s));
     }
 
-    (*ang_mom) = J;
+
+    /* Kepler angular velocity */
+
+    for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) { 
+        d_o_e[s]=deriv_s(omega,s,1);
+        d_g_e[s]=deriv_s(gama,s,1);
+        d_r_e[s]=deriv_s(rho,s,1);
+        d_v_e[s]=deriv_s(velocity,s,1);
+        /* Value of omega on the equatorial plane*/
+        omega_mu_0[s] = omega[[s,1]];
+    }
+
+    let opt_nearest= Some(SDIV >> 1);  
+    let (doe, opt_nearest) = interp(s_gp,d_o_e,s_e, opt_nearest);
+    let (dge, opt_nearest) = interp(s_gp,d_g_e,s_e, opt_nearest);
+    let (dre, opt_nearest) = interp(s_gp,d_r_e,s_e, opt_nearest);
+    // let (dve, opt_nearest) = interp(s_gp,d_v_e,s_e, opt_nearest); // unused
+
+    let exp_rho_eq = (-rho_equator).exp();
+
+    let temp1 = 8.0+dge-dre;
+    let alpha = doe * r_e * exp_rho_eq / temp1;
+    let beta = (dge+dre) / temp1;
+    let vek2 = alpha + alpha.abs() * beta.sqrt();
+    let vek=(doe/(8.0+dge-dre))*r_e*exp_rho_eq + (((dge+dre)/(8.0+dge-dre)) 
+                + ((doe/(8.0+dge-dre))*r_e*exp_rho_eq).powi(2)).sqrt();
+    assert_approx_eq!(vek,vek2);
 
 
-/* Compute the velocities of co-rotating and counter-rotating particles
-with respect to a ZAMO 	*/
-
-for(s=1+(SDIV-1)/2;s<=SDIV;s++) {
-s1= s_gp[s]*(1.0-s_gp[s]);
-s_1=1.0-s_gp[s];
-   
-d_gama_s=deriv_s(gama,s,1);
-d_rho_s=deriv_s(rho,s,1);
-d_omega_s=deriv_s(omega,s,1);
-
-sqrt_v= exp(-2.0*rho[[s,1]])*r_e*r_e*pow(s_gp[s],4.0)*pow(d_omega_s,2.0) 
-       + 2*s1*(d_gama_s+d_rho_s)+s1*s1*(d_gama_s*d_gama_s-d_rho_s*d_rho_s);
-
-if(sqrt_v>0.0) sqrt_v= sqrt(sqrt_v);
-else {
- sqrt_v=0.0;
-}
-
-v_plus[s]=(exp(-rho[[s,1]])*r_e*s_gp[s]*s_gp[s]*d_omega_s + sqrt_v)/
-         (2.0+s1*(d_gama_s-d_rho_s));
-
-v_minus[s]=(exp(-rho[[s,1]])*r_e*s_gp[s]*s_gp[s]*d_omega_s - sqrt_v)/
-          (2.0+s1*(d_gama_s-d_rho_s));
-}
-
-
-/* Kepler angular velocity */
-
-for(s=1;s<=SDIV;s++) { 
-d_o_e[s]=deriv_s(omega,s,1);
-d_g_e[s]=deriv_s(gama,s,1);
-d_r_e[s]=deriv_s(rho,s,1);
-d_v_e[s]=deriv_s(velocity,s,1);
-/* Value of omega on the equatorial plane*/
-omega_mu_0[s] = omega[[s,1]];
-}
-
-n_nearest=SDIV/2; 
-doe=interp(s_gp,d_o_e,SDIV,s_e, &n_nearest);
-dge=interp(s_gp,d_g_e,SDIV,s_e, &n_nearest);
-dre=interp(s_gp,d_r_e,SDIV,s_e, &n_nearest);
-dve=interp(s_gp,d_v_e,SDIV,s_e, &n_nearest);
-
-vek=(doe/(8.0+dge-dre))*r_e*exp(-rho_equator) + sqrt(((dge+dre)/(8.0+dge
-   -dre)) + pow((doe/(8.0+dge-dre))*r_e*exp(-rho_equator),2.0));
-
-
-if (r_ratio ==1.0)
-omega_equator = 0.0;
-else
-omega_equator = interp(s_gp,omega_mu_0,SDIV,s_e, &n_nearest);
+    let omega_equator = match approx::abs_diff_eq!(r_ratio, 1.0) {
+        true => 0.0,
+        false => interp(s_gp,omega_mu_0,s_e, opt_nearest).0,
+    };
 
 
 
-if(strcmp(eos_type,"tab")==0) 
-(*Omega_K) = (C/sqrt(KAPPA))*(omega_equator+vek*exp(rho_equator)/r_e);
-else 
-(*Omega_K) = omega_equator + vek*exp(rho_equator)/r_e;
+    *omega_k = omega_equator + vek * rho_equator.exp() /r_e;
+    if matches!(eos_type,EosType::Table) {
+        *omega_k *= CC / KAPPA.sqrt();
+    }
 
-
-free_dmatrix(velocity,1,SDIV,1,MDIV);
-free_dmatrix(rho_0,1,SDIV,1,MDIV);
-
-
-
-
-
-}
+} // mass_radius()
