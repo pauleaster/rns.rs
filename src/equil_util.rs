@@ -636,7 +636,7 @@ fn test_sphere() {
 
 }
 #[allow(clippy::too_many_arguments)]
-fn sphere(s_gp: &[f64;SDIV],
+pub fn sphere(s_gp: &[f64;SDIV],
             opt_log_e_tab: &Option<Vec<f64>>,
             opt_log_p_tab: &Option<Vec<f64>>,
             opt_log_h_tab: &Option<Vec<f64>>,
@@ -699,7 +699,7 @@ fn sphere(s_gp: &[f64;SDIV],
     // println!("r_is_gp=\n{:?}", r_is_gp);
     // println!("lambda_gp=\n{:?}", lambda_gp);
     // println!("nu_gp=\n{:?}", nu_gp);
-    println!("\nr_is_final, r_final, m_final = ({}, {}, {})\n",r_is_final, r_final, m_final);
+    // println!("\nr_is_final, r_final, m_final = ({}, {}, {})\n",r_is_final, r_final, m_final);
 
 
     let nearest= RDIV >> 1;
@@ -840,6 +840,19 @@ fn legendre_poly_lm(l: i32, m: i32, x: f64) -> f64 { // renamed from plgndr()
 
 }
 
+pub fn calc_sin_theta(mu: &[f64]) -> ([f64;MDIV], [f64;MDIV]){
+    
+    let sin_theta = &mut [0_f64;MDIV];
+    let theta = &mut [0_f64;MDIV];
+    
+    for m in 0 ..= MDIV - 1 { //for(m=1;m<=MDIV;m++) { 
+        sin_theta[m] = (1.0-mu[m]*mu[m]).sqrt();   // Why not acos(mu[m]) ?
+        theta[m] = sin_theta[m].asin();
+    }
+    (*sin_theta, *theta)
+}
+
+
 
 
 pub fn test_spin() {
@@ -880,11 +893,26 @@ pub fn test_spin() {
     let accuracy =1e-5;
     let cf = 1.0;
     let big_omega = &mut 0.0;
+
+    let (sin_theta, theta) = calc_sin_theta(&m);
+
+    
+
+    let sin_2n_p1_th_m = &mut Array2::<f64>::zeros((LMAX,MDIV)); 
+    for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
+        let scalar = 2.0 * n as f64 + 1.0;
+        for m in 0 ..= MDIV-1 { // for(m=1;m<=MDIV-2;m+=2) {                       
+            sin_2n_p1_th_m[[n,m]] = (scalar * theta[m]).sin();
+        }
+    }
+    
+
     
 
     spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
         enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
-        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega);
+        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega,
+        sin_theta, theta, sin_2n_p1_th_m);
 
     println!("Finished, r_e = {:0.16}",r_e);
 
@@ -900,7 +928,7 @@ fn test_test_spin() {
 /*************************************************************************/
 /* Main iteration cycle for computation of the rotating star's metric    */
 /*************************************************************************/
-fn spin(
+pub fn spin(
     s_gp : &[f64],
     mu: &[f64],
     opt_log_e_tab: &Option<Vec<f64>>, 
@@ -923,7 +951,10 @@ fn spin(
     cf: f64,
     r_ratio: f64,
     r_e_new: &mut f64,
-    big_omega: &mut f64) {
+    big_omega: &mut f64,
+    sin_theta: [f64;MDIV],
+    theta: [f64;MDIV],
+    sin_2n_p1_th_m: &mut Array2<f64>) {
 
     let mut n_of_it=0;              /* number of iterations */
     let print_dif = false;
@@ -1056,13 +1087,13 @@ fn spin(
     } // free_dmatrix(f2n,1,LMAX+1,1,SDIV);, f2n automatically freed here as it falls out of scope, 
 
 
-    let sin_theta = &mut [0_f64;MDIV];
-    let theta = &mut [0_f64;MDIV];
+    // let sin_theta = &mut [0_f64;MDIV];
+    // let theta = &mut [0_f64;MDIV];
     
-    for m in 0 ..= MDIV - 1 { //for(m=1;m<=MDIV;m++) { 
-        sin_theta[m] = (1.0-mu[m]*mu[m]).sqrt();   // Why not acos(mu[m]) ?
-        theta[m] = sin_theta[m].asin();
-    }
+    // for m in 0 ..= MDIV - 1 { //for(m=1;m<=MDIV;m++) { 
+    //     sin_theta[m] = (1.0-mu[m]*mu[m]).sqrt();   // Why not acos(mu[m]) ?
+    //     theta[m] = sin_theta[m].asin();
+    // }
 
 
     let mut r_e = *r_e_new;
@@ -1342,10 +1373,14 @@ fn spin(
                         // sum_rho += DM / 3.0 * (p_2n[[m,n+1]] * s_rho[[k,m]]
                         //         + 4.0 * p_2n[[m+1,n+1]] * s_rho[[k,m+1]] 
                         //         + p_2n[[m+2,n+1]] * s_rho[[k,m+2]]);
+
+                        // sin_2n_p1_th_m[[n,m]]  <= ((2.0 * n as f64 + 1.0) * theta[m]).sin() 
+                        // sin_2n_p1_th_m[[n,m+1]] <= ((2.0 * n as f64 + 1.0) * theta[m+1]).sin()
+                        // sin_2n_p1_th_m[[n,m+2]] <= ((2.0 * n as f64 + 1.0) * theta[m+2]).sin()
                                 
-                        sum_gama += DM / 3.0 * ( ((2.0 * (n+1) as f64 - 1.0) * theta[m]).sin() * s_gama[[k,m]]  // n => (n+1) as f64
-                        + 4.0 * ((2.0 * (n+1) as f64 - 1.0) * theta[m+1]).sin() * s_gama[[k,m+1]]
-                        + ((2.0 * (n+1) as f64 - 1.0) * theta[m+2]).sin() * s_gama[[k,m+2]]);
+                        sum_gama += DM / 3.0 * (    sin_2n_p1_th_m[[n,m]]     * s_gama[[k,m]]  // n => (n+1) as f64
+                        + 4.0 * sin_2n_p1_th_m[[n,m+1]] * s_gama[[k,m+1]]
+                        + sin_2n_p1_th_m[[n,m+2]] * s_gama[[k,m+2]]);
 
                         let dom = DM / 3.0 * (sin_theta[m] * p1_2n_1[[m,n+1]] * s_omega[[k,m]]
                             +4.0 * sin_theta[m+1] * p1_2n_1[[m+1,n+1]] * s_omega[[k,m+1]]
@@ -1465,8 +1500,11 @@ fn spin(
                         else { 
                             sum_omega += -e_rsm*e_gsm*(p1_2n_1[[m,n+1]]/(2.0 * (n+1) as f64
                                             *(2.0 * (n+1) as f64 - 1.0)*temp1))*d2_omega[[s,n+1]];
+                            // sin_2n_p1_th_m[[n,m]]  <= ((2.0 * n as f64 + 1.0) * theta[m]).sin() 
+                            // sin_2n_p1_th_m[[n,m+1]] <= ((2.0 * n as f64 + 1.0) * theta[m+1]).sin()
+                            // sin_2n_p1_th_m[[n,m+2]] <= ((2.0 * n as f64 + 1.0) * theta[m+2]).sin()
 
-                            sum_gama += -(2.0/PI)*e_gsm*( ((2.0 * (n+1) as f64-1.0)*theta[m]).sin()
+                            sum_gama += -(2.0/PI)*e_gsm*( sin_2n_p1_th_m[[n,m]]
                                         /((2.0 * (n+1) as f64 - 1.0)*temp1))*d2_gama[[s,n+1]];   
                         }
                     } // for n
@@ -1692,6 +1730,125 @@ fn spin(
 
 } // spin()
 
+#[allow(clippy::too_many_arguments)]
+pub fn printpoly(r_ratio: f64, 
+                e_center: f64, 
+                mass: f64, 
+                mass_0: f64, 
+                rr_e: f64, 
+                omega: f64, 
+                omega_k: f64, 
+                j: f64)  {
+
+
+
+        let i = match approx::abs_diff_eq!(omega, 0.0) {
+            true => 0.0,
+            false => j/omega,
+        };
+        println!("{:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} ", 
+        r_ratio, e_center, mass, mass_0, rr_e, omega, omega_k, i, j/mass_0.powi(2));
+    }
+
+    #[allow(clippy::too_many_arguments)]
+pub fn print_ns(r_ratio: f64, 
+                e_center: f64, 
+                mass: f64, 
+                mass_0: f64, 
+                rr_e: f64, 
+                omega: f64, 
+                omega_k: f64, 
+                j: f64)  {
+
+
+
+        let i45 = match approx::abs_diff_eq!(omega, 0.0) {
+            true => 0.0,
+            false => j/omega/1.0e45,
+        };
+        println!("{:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} ", 
+        r_ratio, e_center, mass/MSUN, mass_0/MSUN, rr_e/1e5, omega, omega_k, i45, CC * j/ mass.powi(2)/ GG);
+
+    }
+
+pub fn test_mass_radius() {
+    let (s,m) = make_grid();
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, _) = load_eos("./eos/eosA").unwrap(); 
+    let eos_type = &EosType::Table;
+    // let opt_gamma_p = None;
+    let opt_log_e_tab = &Some(log_e_tab);
+    let opt_log_p_tab = &Some(log_p_tab);
+    let opt_log_h_tab = &Some(log_h_tab);
+    let opt_log_n0_tab = &Some(log_n0_tab);
+    let unscaled_e_center = 1e15;
+    let e_center = unscaled_e_center * CC * CC * KSCALE;
+    
+    let (p_center, h_center) = make_center(opt_log_e_tab, 
+                                            opt_log_p_tab , 
+                                            opt_log_h_tab, 
+                                            &EosType::Table, 
+                                            &None, 
+                                            e_center).unwrap();
+
+    let (e_surface, p_surface) = get_e_p_surface(eos_type);
+    let mut rho = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let mut gama = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let mut alpha = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let mut omega = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let mut energy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let mut pressure = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let mut enthalpy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let mut velocity_sq = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let mut r_e = 0.0;
+
+    sphere(&s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, 
+            e_center, p_center, p_surface, e_surface, &mut rho, &mut gama, &mut alpha, &mut omega, &mut r_e);
+
+    let r_ratio = 1.3;
+    let enthalpy_min = get_min_enthalpy( eos_type);
+    let a_check = &mut 0;
+    let accuracy =1e-5;
+    let cf = 1.0;
+    let big_omega = &mut 0.0;
+    
+
+    let (sin_theta, theta) = calc_sin_theta(&m);
+    let mut sin_2n_p1_th_m = &mut Array2::<f64>::zeros((LMAX,MDIV)); 
+    for n in 0 ..= LMAX-1 { // for(n=1;n<=LMAX;n++) {
+        let scalar = 2.0 * n as f64 + 1.0;
+        for m in 0 ..= MDIV-1 { // for(m=1;m<=MDIV-2;m+=2) {                       
+            sin_2n_p1_th_m[[n,m]] = (scalar * theta[m]).sin();
+        }
+    }
+
+
+    spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
+        enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
+        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega, sin_theta, theta, &mut sin_2n_p1_th_m);
+
+    // println!("Finished spin, r_e = {:0.16}",r_e);
+
+    let mass: &mut f64 = &mut 0.0;
+    let mass_0: &mut f64 = &mut 0.0;
+    let ang_mom: &mut f64 = &mut 0.0;
+    let rr_e: &mut f64 = &mut 0.0;
+    let v_plus= &mut[0_f64;SDIV];
+    let v_minus= &mut[0_f64;SDIV];
+    let omega_k: &mut f64 = &mut 0.0;
+
+    mass_radius(
+        &s, &m, opt_log_e_tab, opt_log_n0_tab, eos_type, rho, gama, alpha, omega, 
+        energy, pressure, enthalpy, velocity_sq, r_ratio, e_surface, 
+        r_e, mass, mass_0, ang_mom, rr_e, v_plus, v_minus, omega_k);
+
+    print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
+}
+
+
+#[test]
+fn test_test_mass_radius() {
+    test_mass_radius();
+}
 
 #[allow(clippy::too_many_arguments)]
 /***********************************************************************/
@@ -1700,15 +1857,12 @@ fn spin(
  * 	and the velocity of co- and counter-rotating particles      
  *	with respect to a ZAMO                                         */
 /***********************************************************************/
-fn mass_radius(
+pub fn mass_radius(
     s_gp : &[f64],
     mu: &[f64],
     opt_log_e_tab: &Option<Vec<f64>>, 
-    // opt_log_p_tab: &Option<Vec<f64>>, 
-    // opt_log_h_tab: &Option<Vec<f64>>, 
     opt_log_n0_tab: &Option<Vec<f64>>,                  
     eos_type: &EosType,
-    // opt_gamma_p: &Option <f64>, 
     rho: &mut Array2<f64>,
     gama: &mut Array2<f64>,
     alpha: &mut Array2<f64>,
@@ -1720,7 +1874,6 @@ fn mass_radius(
     r_ratio: f64,
     e_surface: f64,
     r_e: f64,
-    // big_omega: f64,
     mass: &mut f64, 
     mass_0: &mut f64,
     ang_mom: &mut f64,
@@ -1895,12 +2048,14 @@ fn mass_radius(
 
     }
     
-    *mass = 4.0 * PI * r_e.powi(3);;
+    let mut mass_scale = 4.0 * PI * r_e.powi(3);
+   
     if matches!(eos_type, EosType::Table) {
-        *mass *= KAPPA.sqrt() * CC * CC / GG;
+        mass_scale *= KAPPA.sqrt() * CC * CC / GG;
     };
 
-    *mass_0 = *mass; 
+    *mass *= mass_scale;
+    *mass_0 *= mass_scale; 
 
     if approx::abs_diff_eq!(r_ratio, 1.0) {    
         j = 0.0; 
@@ -1923,9 +2078,9 @@ fn mass_radius(
         let s1= s_gp[s]*(1.0-s_gp[s]);
         // let s_1=1.0-s_gp[s]; // unused
         
-        let d_gama_s=deriv_s(gama,s,1);
-        let d_rho_s=deriv_s(rho,s,1);
-        let d_omega_s=deriv_s(omega,s,1);
+        let d_gama_s=deriv_s(gama,s,0);
+        let d_rho_s=deriv_s(rho,s,0);
+        let d_omega_s=deriv_s(omega,s,0);
         let exp_min_2_rho_s0 = (-2.0*rho[[s,0]]).exp();
         let exp_min_rho_s0 = (-rho[[s,0]]).exp();
         let s_gp_sqr = s_gp[s] * s_gp[s];
@@ -1951,12 +2106,12 @@ fn mass_radius(
     /* Kepler angular velocity */
 
     for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) { 
-        d_o_e[s]=deriv_s(omega,s,1);
-        d_g_e[s]=deriv_s(gama,s,1);
-        d_r_e[s]=deriv_s(rho,s,1);
-        d_v_e[s]=deriv_s(velocity,s,1);
+        d_o_e[s]=deriv_s(omega,s,0);
+        d_g_e[s]=deriv_s(gama,s,0);
+        d_r_e[s]=deriv_s(rho,s,0);
+        d_v_e[s]=deriv_s(velocity,s,0);
         /* Value of omega on the equatorial plane*/
-        omega_mu_0[s] = omega[[s,1]];
+        omega_mu_0[s] = omega[[s,0]];
     }
 
     let opt_nearest= Some(SDIV >> 1);  
@@ -1973,7 +2128,10 @@ fn mass_radius(
     let vek2 = alpha + alpha.abs() * beta.sqrt();
     let vek=(doe/(8.0+dge-dre))*r_e*exp_rho_eq + (((dge+dre)/(8.0+dge-dre)) 
                 + ((doe/(8.0+dge-dre))*r_e*exp_rho_eq).powi(2)).sqrt();
-    assert_approx_eq!(vek,vek2);
+    if approx::abs_diff_eq!(vek, vek2) {
+        println!("{:0.16} != {:0.16}",vek,vek2)
+    };
+    
 
 
     let omega_equator = match approx::abs_diff_eq!(r_ratio, 1.0) {
