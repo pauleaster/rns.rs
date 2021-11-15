@@ -5,8 +5,8 @@ use std::process::exit;
 // use approx::{relative_eq, relative_ne};
 use assert_approx_eq::assert_approx_eq;
 use ndarray::{Array2, Array3, Zip, array, prelude::*};
-use std::error::Error;
-use std::time::Instant;
+use std::{error::Error, time::Instant, fmt};
+
 
 
 use crate::consts::*;
@@ -16,6 +16,31 @@ use crate::equil::{e_at_p, e_of_rho0, get_e_p_surface, get_min_enthalpy, h_at_p,
 pub enum EosType {
     Table,
     Polytropic,
+}
+
+
+
+#[derive(Debug)]
+pub struct RnsError { // credit: https://stevedonovan.github.io/rust-gentle-intro/6-error-handling.html
+    details: String
+}
+
+impl RnsError {
+    fn new(msg: &str) -> RnsError {
+        RnsError{details: msg.to_string()}
+    }
+}
+
+impl fmt::Display for RnsError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{}",self.details)
+    }
+}
+
+impl Error for RnsError {
+    fn description(&self) -> &str {
+        &self.details
+    }
 }
 
 #[test]
@@ -852,7 +877,58 @@ pub fn calc_sin_theta(mu: &[f64]) -> ([f64;MDIV], [f64;MDIV]){
     (*sin_theta, *theta)
 }
 
+pub fn print_metric(
+    rho: & Array2<f64>,
+    gama: &Array2<f64>,
+    alpha: &Array2<f64>,
+    omega: & Array2<f64>,
+    energy: & Array2<f64>,
+    pressure: & Array2<f64>,
+    enthalpy: & Array2<f64>,
+    velocity_sq: & Array2<f64>,
+    prefix: &str) {
 
+    let sindices: &[usize;6] = &[0, SDIV / 5, 2 * SDIV / 5, 3 * SDIV / 5, 4 * SDIV / 5 ,SDIV-1];
+    let mindices: &[usize;6] = &[0, MDIV / 5, 2 * MDIV / 5, 3 * MDIV / 5, 4 * MDIV / 5 ,MDIV-1];
+
+    print!("\n{}",prefix);
+    print!("\n{:<15}", "rho:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,rho[[s,m]]);
+    }
+    print!("\n{:<15}", "gama:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,gama[[s,m]]);
+    }
+
+    print!("\n{:<15}", "alpha:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,alpha[[s,m]]);
+    }
+    
+    print!("\n{:<15}", "omega:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,omega[[s,m]]);
+    }
+    print!("\n{:<15}", "energy:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,energy[[s,m]]);
+    }
+    print!("\n{:<15}", "pressure:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,pressure[[s,m]]);
+    }
+    print!("\n{:<15}", "enthalpy:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,enthalpy[[s,m]]);
+    }
+    print!("\n{:<15}", "velocity_sq:");
+    for (&s,&m) in sindices.iter().zip(mindices) {
+        print!("({:3},{:3})={:8.3} ",s,m,velocity_sq[[s,m]]);
+    }
+    println!();
+
+    }
 
 
 pub fn test_spin() {
@@ -912,7 +988,7 @@ pub fn test_spin() {
     spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
         enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
         a_check, accuracy, cf, r_ratio, &mut r_e, big_omega,
-        sin_theta, theta, sin_2n_p1_th_m);
+        sin_theta, sin_2n_p1_th_m);
 
     println!("Finished, r_e = {:0.16}",r_e);
 
@@ -953,7 +1029,7 @@ pub fn spin(
     r_e_new: &mut f64,
     big_omega: &mut f64,
     sin_theta: [f64;MDIV],
-    theta: [f64;MDIV],
+    // theta: [f64;MDIV],
     sin_2n_p1_th_m: &mut Array2<f64>) {
 
     let mut n_of_it=0;              /* number of iterations */
@@ -1256,6 +1332,7 @@ pub fn spin(
         // println!("before_metric_enthalpy[[7,7]] = {:0.16e}",enthalpy[[7,7]]);
         // println!("before_metric_pressure[[7,7]] = {:0.16e}",pressure[[7,7]]);
         // println!("before_metric_energy[[7,7]] = {:0.16e}",energy[[7,7]]);
+        // print_metric(rho, gama, alpha, omega);
 
 
         {
@@ -1538,7 +1615,7 @@ pub fn spin(
             *a_check= 200; 
             break; 
         }
-
+        // print_metric(rho, gama, alpha, omega);
 
         /* TREAT SPHERICAL CASE */
         
@@ -1707,7 +1784,7 @@ pub fn spin(
         
     }   /* end while */
 
-
+    // print_metric(rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,"spin");
 
    /* COMPUTE OMEGA */  
 
@@ -1766,10 +1843,25 @@ pub fn print_ns(r_ratio: f64,
             true => 0.0,
             false => j/omega/1.0e45,
         };
-        println!("{:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} {:4.3} ", 
+        println!("{:7.4} {:7.3} {:7.3} {:7.3} {:7.2} {:8.1} {:8.1} {:8.4} {:8.4} ", 
         r_ratio, e_center, mass/MSUN, mass_0/MSUN, rr_e/1e5, omega, omega_k, i45, CC * j/ mass.powi(2)/ GG);
 
     }
+
+
+
+pub fn print_header()  {
+
+    println!("{:>7} {:>7} {:>7} {:>7} {:>7} {:>8} {:>8} {:>8} {:>8} ", 
+        "ratio", "e_15", "M", "M_0", "r_star", "spin", "Omega_K", "I", "J/M^2");
+    println!("{:>7} {:>7} {:>7} {:>7} {:>7} {:>8} {:>8} {:>8} {:>8} ",
+        "1", "g/cm^3", "M⊙", "M⊙", "km", "s-1", "s-1", "s-1", "1");
+
+}
+
+    
+
+
 
 pub fn test_mass_radius() {
     let (s,m) = make_grid();
@@ -1824,7 +1916,7 @@ pub fn test_mass_radius() {
 
     spin(&s, &m, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, &None, h_center,
         enthalpy_min, rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq,
-        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega, sin_theta, theta, &mut sin_2n_p1_th_m);
+        a_check, accuracy, cf, r_ratio, &mut r_e, big_omega, sin_theta,  &mut sin_2n_p1_th_m);
 
     // println!("Finished spin, r_e = {:0.16}",r_e);
 
@@ -1836,7 +1928,7 @@ pub fn test_mass_radius() {
     let v_minus= &mut[0_f64;SDIV];
     let omega_k: &mut f64 = &mut 0.0;
 
-    mass_radius(
+    let res = mass_radius(
         &s, &m, opt_log_e_tab, opt_log_n0_tab, eos_type, rho, gama, alpha, omega, 
         energy, pressure, enthalpy, velocity_sq, r_ratio, e_surface, 
         r_e, mass, mass_0, ang_mom, rr_e, v_plus, v_minus, omega_k);
@@ -1880,7 +1972,7 @@ pub fn mass_radius(
     rr_e: &mut f64,
     v_plus: &mut [f64],
     v_minus: &mut [f64],
-    omega_k: &mut f64) {
+    omega_k: &mut f64) -> Result<(), RnsError>{
 // int s,
 // m,
 // n_nearest;
@@ -1979,56 +2071,87 @@ pub fn mass_radius(
         },
     }
 
-    
+    let two_alpha_gama_exp = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let two_alpha_gama_rho_on_two_exp = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let two_alpha_gama_rho_exp = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    for s in 0 ..= SDIV-1 {
+        for m in 0 ..= MDIV - 1 {
+            let temp1 = (2.0 * alpha[[s,m]] + gama[[s,m]]).exp(); 
+            let temp2 = (2.0 * alpha[[s,m]]+(gama[[s,m]] - rho[[s,m]]) / 2.0).exp(); 
+            let temp3 = (2.0 * alpha[[s,m]] + gama[[s,m]] - rho[[s,m]]).exp();
+            if !(temp1.is_finite() && temp2.is_finite() && temp3.is_finite()) {
+                return Err(RnsError::new("Overflow."));
+            }
+            two_alpha_gama_exp[[s,m]] = temp1;
+            two_alpha_gama_rho_on_two_exp[[s,m]] = temp2;
+            two_alpha_gama_rho_exp[[s,m]] = temp3;
+        }
+    }
+
+
 
     for s in 0 ..= SDIV-1 { // (s=1;s<=SDIV;s++) {
         d_m[s]=0.0;           /* initialize */
         d_m_0[s]=0.0;
         d_j[s]=0.0;
 
-
+    
     for m in (0 ..= MDIV-3).step_by(2) { // (m=1;m<=MDIV-2;m+=2) {
-        d_m[s] += (1.0/(3.0 * (MDIV-1) as f64)) * ( (2.0 * alpha[[s,m]] + gama[[s,m]]).exp() *
+        let dd_m = (1.0/(3.0 * (MDIV-1) as f64)) * ( two_alpha_gama_exp[[s,m]] *
                 (((energy[[s,m]] + pressure[[s,m]]) / (1.0 - velocity_sq[[s,m]])) *
                 (1.0 + velocity_sq[[s,m]] + (2.0 * s_gp[s] * (velocity_sq[[s,m]]).sqrt()/
                 (1.0 - s_gp[s])) * (1.0-mu[m]*mu[m]).sqrt() * r_e * omega[[s,m]] *
                 (-rho[[s,m]]).exp()) + 2.0 * pressure[[s,m]])
 
-            + 4.0 * (2.0 * alpha[[s,m+1]] + gama[[s,m+1]]).exp() *
+            + 4.0 * two_alpha_gama_exp[[s,m+1]] *
                 (((energy[[s,m+1]] + pressure[[s,m+1]]) / (1.0 - velocity_sq[[s,m+1]])) *
                 (1.0 + velocity_sq[[s,m+1]] + (2.0*s_gp[s] * (velocity_sq[[s,m+1]]).sqrt() /
                 (1.0 - s_gp[s])) * (1.0-mu[m+1]*mu[m+1]).sqrt() * r_e*omega[[s,m+1]] *
                 (-rho[[s,m+1]]).exp()) + 2.0 * pressure[[s,m+1]]) 
 
-            + (2.0*alpha[[s,m+2]] + gama[[s,m+2]]).exp() *
+            + two_alpha_gama_exp[[s,m+2]] *
                 (((energy[[s,m+2]] + pressure[[s,m+2]]) / (1.0 - velocity_sq[[s,m+2]])) *
                 (1.0 + velocity_sq[[s,m+2]] +( 2.0 * s_gp[s] *(velocity_sq[[s,m+2]]).sqrt() /
                 (1.0 - s_gp[s])) * (1.0-mu[m+2] * mu[m+2]).sqrt() * r_e * omega[[s,m+2]] *
-                (-rho[[s,m+2]]).exp()) + 2.0*pressure[[s,m+2]]));    
+                (-rho[[s,m+2]]).exp()) + 2.0*pressure[[s,m+2]])); 
+        // if !dd_m.is_finite(){
+        //     println!("delta d_m is not a finite number dd_m={}", dd_m);
+        //     // println!("(s,m)=({},{})",s,m);
+        //     // println!("(1.0-velocity_sq[[s,m]]).sqrt() = {}",(1.0-velocity_sq[[s,m]]).sqrt());
+        //     // println!("(1.0-velocity_sq[[s,m+1]]).sqrt() = {}",(1.0-velocity_sq[[s,m+1]]).sqrt());
+        //     // println!("(1.0-velocity_sq[[s,m+2]]).sqrt() = {}",(1.0-velocity_sq[[s,m+2]]).sqrt());
+        //     // println!("{} {} {} {} {}",s_gp[s],r_e,mu[m],mu[m+1],mu[m+2]);
+        //     // println!("{} {} {} {} {} {} {}", alpha[[s,m]],gama[[s,m]],energy[[s,m]],pressure[[s,m]],velocity_sq[[s,m]],omega[[s,m]],rho[[s,m]]);
+        //     // println!("{} {} {} {} {} {} {}",alpha[[s,m+1]],gama[[s,m+1]],energy[[s,m+1]],pressure[[s,m+1]],velocity_sq[[s,m+1]],omega[[s,m+1]],rho[[s,m+1]]);
+        //     // println!("{} {} {} {} {} {} {}",alpha[[s,m+2]],gama[[s,m+2]],energy[[s,m+2]],pressure[[s,m+2]],velocity_sq[[s,m+2]],omega[[s,m+2]],rho[[s,m+2]]);
+        //     // println!("(2.0 * alpha[[s,m]] + gama[[s,m]]).exp() = {}",(2.0 * alpha[[s,m]] + gama[[s,m]]).exp());
 
-        d_m_0[s] += (1.0/(3.0 * (MDIV-1) as f64))*( (2.0 * alpha[[s,m]] + (gama[[s,m]]
-                - rho[[s,m]]) / 2.0).exp() * rho_0[[s,m]] / (1.0-velocity_sq[[s,m]]).sqrt()
-
-                + 4.0 * (2.0 * alpha[[s,m+1]]+(gama[[s,m+1]]
-                - rho[[s,m+1]]) / 2.0).exp() * rho_0[[s,m+1]] / (1.0-velocity_sq[[s,m+1]]).sqrt()
-            
-                + (2.0 * alpha[[s,m+2]] + (gama[[s,m+2]]
-                - rho[[s,m+2]]) / 2.0).exp() * rho_0[[s,m+2]] / (1.0-velocity_sq[[s,m+2]]).sqrt());
 
 
-        d_j[s] += (1.0/(3.0 * (MDIV-1) as f64)) * ( (1.0-mu[m]*mu[m]).sqrt() *
-                (2.0 * alpha[[s,m]] + gama[[s,m]] - rho[[s,m]]).exp() * (energy[[s,m]]
+        //     exit(1);
+        // }
+        d_m[s] +=  dd_m;  
+        let dd_m_0 = (1.0/(3.0 * (MDIV-1) as f64))*( two_alpha_gama_rho_on_two_exp[[s,m]] * rho_0[[s,m]] / (1.0-velocity_sq[[s,m]]).sqrt()
+
+            + 4.0 * two_alpha_gama_rho_on_two_exp[[s,m+1]] * rho_0[[s,m+1]] / (1.0-velocity_sq[[s,m+1]]).sqrt()
+        
+            + two_alpha_gama_rho_on_two_exp[[s,m+2]] * rho_0[[s,m+2]] / (1.0-velocity_sq[[s,m+2]]).sqrt());
+
+        d_m_0[s] += dd_m_0;
+        let dd_j = (1.0/(3.0 * (MDIV-1) as f64)) * ( (1.0-mu[m]*mu[m]).sqrt() *
+        two_alpha_gama_rho_exp[[s,m]] * (energy[[s,m]]
                 + pressure[[s,m]]) * (velocity_sq[[s,m]]).sqrt() / (1.0 - velocity_sq[[s,m]])
 
                 + 4.0 * (1.0 - mu[m+1] * mu[m+1]).sqrt() *
-                (2.0 * alpha[[s,m+1]] + gama[[s,m+1]] - rho[[s,m+1]]).exp() * (energy[[s,m+1]]
+                two_alpha_gama_rho_exp[[s,m+1]] * (energy[[s,m+1]]
                 + pressure[[s,m+1]]) * (velocity_sq[[s,m+1]]).sqrt() /
                 (1.0 - velocity_sq[[s,m+1]])
 
                 + (1.0 - mu[m+2] * mu[m+2]).sqrt() *
-                (2.0 * alpha[[s,m+2]] + gama[[s,m+2]] - rho[[s,m+2]]).exp() * (energy[[s,m+2]]
+                two_alpha_gama_rho_exp[[s,m+2]] * (energy[[s,m+2]]
                 + pressure[[s,m+2]]) * (velocity_sq[[s,m+2]]).sqrt() /
                 (1.0 - velocity_sq[[s,m+2]]));
+        d_j[s] += dd_j;
         }
     }
 
@@ -2047,6 +2170,7 @@ pub fn mass_radius(
             d_j[s+2]);
 
     }
+    // println!("mass = {:8.3}", *mass);
     
     let mut mass_scale = 4.0 * PI * r_e.powi(3);
    
@@ -2123,9 +2247,9 @@ pub fn mass_radius(
     let exp_rho_eq = (-rho_equator).exp();
 
     let temp1 = 8.0+dge-dre;
-    let alpha = doe * r_e * exp_rho_eq / temp1;
+    let alf = doe * r_e * exp_rho_eq / temp1;
     let beta = (dge+dre) / temp1;
-    let vek2 = alpha + alpha.abs() * beta.sqrt();
+    let vek2 = alf + alf.abs() * beta.sqrt();
     let vek=(doe/(8.0+dge-dre))*r_e*exp_rho_eq + (((dge+dre)/(8.0+dge-dre)) 
                 + ((doe/(8.0+dge-dre))*r_e*exp_rho_eq).powi(2)).sqrt();
     if approx::abs_diff_eq!(vek, vek2) {
@@ -2145,5 +2269,8 @@ pub fn mass_radius(
     if matches!(eos_type,EosType::Table) {
         *omega_k *= CC / KAPPA.sqrt();
     }
+
+    // print_metric(rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq, "mr");
+    Ok(())
 
 } // mass_radius()
