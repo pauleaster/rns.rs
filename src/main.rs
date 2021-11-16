@@ -1,5 +1,6 @@
 pub mod equil;
 pub mod consts;
+pub mod rns_plotting;
 mod equil_util;
 use std::{process::exit, time::Instant};
 
@@ -7,8 +8,9 @@ use consts::*;
 use equil::{get_e_p_surface, get_min_enthalpy, load_eos, make_center, make_grid};
 use equil_util::{EosType, mass_radius, print_ns, sphere, spin};
 use ndarray::Array2;
+use rns_plotting::write_array2;
 
-use crate::equil_util::{RnsError, calc_sin_theta, print_header};
+use crate::{equil_util::{RnsError, calc_sin_theta, print_header}, rns_plotting::contourf};
 
 
 
@@ -17,7 +19,7 @@ fn main()  {
     
     let start = Instant::now();
     let (s,m) = make_grid();
-    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, _) = load_eos("./eos/eosA").unwrap(); 
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, _) = load_eos("./eos/LS_220_25-Sept-2017.rns").unwrap(); 
     let eos_type = &EosType::Table;
     // let opt_gamma_p = None;
     let opt_log_e_tab = &Some(log_e_tab);
@@ -50,9 +52,11 @@ fn main()  {
     print_header();
 
     let base_e_center = 1e15;
-    for e_scalar in [1] {
+    for e_scalar in 4 .. 5 {
         let mut continue_iteration = true;
+        println!("\n*****************************************");
         println!("e_center = {:0.3}",base_e_center * e_scalar as f64 * CC * CC * KSCALE);
+        println!("*****************************************\n");
 
         let unscaled_e_center = base_e_center * e_scalar as f64;
         let e_center = unscaled_e_center * CC * CC * KSCALE;
@@ -122,7 +126,14 @@ fn main()  {
             continue;
         };
 
-        
+        contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," Ω=0"," NonRotating");
+        contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," Ω=0"," NonRotating");
+        contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," Ω=0"," NonRotating");
+        contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," Ω=0"," NonRotating");
+        contourf(&s, &m, energy, "energy", "./html/energy"," Ω=0"," NonRotating");
+        contourf(&s, &m, pressure, "pressure", "./html/pressure"," Ω=0"," NonRotating");
+        contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," Ω=0"," NonRotating");
+        contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," Ω=0"," NonRotating");
         
         
         let elapsed = start.elapsed().as_secs_f64();
@@ -166,6 +177,17 @@ fn main()  {
             };
 
             print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
+
+            if approx::abs_diff_eq!(r_ratio, 0.75) {
+                contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, energy, "energy", "./html/energy"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, pressure, "pressure", "./html/pressure"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," ~Ωmax/2"," OmegamaxOn2");
+            }
 
             
             old_diff_omega = diff_omega;
@@ -290,4 +312,26 @@ fn main()  {
             print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
         } // if continue_iteration
     } // for
+
+    // let filenames = ["rho", "gama", "alpha", "omega", "energy", "pressure", "enthalpy", "velocity_sq"];
+    
+    
+    // for (idx,  array) in [rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq].iter_mut().enumerate() {
+        // let filename = format!("{}.csv",filenames[idx]);
+        // write_array2(array,&filename[..]).unwrap();
+    contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," Ωmax"," Omegamax");
+    contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," Ωmax"," Omegamax");
+    contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," Ωmax"," Omegamax");
+    contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," Ωmax"," Omegamax");
+    contourf(&s, &m, energy, "energy", "./html/energy"," Ωmax"," Omegamax");
+    contourf(&s, &m, pressure, "pressure", "./html/pressure"," Ωmax"," Omegamax");
+    contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," Ωmax"," Omegamax");
+    contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," Ωmax"," Omegamax");
+
+    
+
+//  }
+
+
+    
 }

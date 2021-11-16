@@ -48,20 +48,21 @@ pub fn make_grid() -> ([f64;SDIV],[f64;MDIV]){
 fn test_read_eos_file () {
 
     // Ordering of the columns vectors:  rho, p, h, n0
-    let (e, p, h, n0, n_tab) = read_eos_file("./eos/eosA").unwrap();
-    assert_eq!(n_tab, 102);
+    let (e, p, h, n0, n_tab) = read_eos_file("./eos/LS_220_25-Sept-2017.rns").unwrap();
+    assert_eq!(n_tab, 193);
     // First row:
-    // 3.95008e+01 1.27820e+14 1.000000000000000e+00 2.379569102499467e+25 
-    assert_approx_eq!(e[0], 3.95008e+01);
-    assert_approx_eq!(p[0], 1.27820e+14);
+    //1.000001449410774e+00  1.000000000000000e+00  1.000000000000000e+00  6.082122082647290e+23 
+    
+    assert_approx_eq!(e[0], 1.000001449410774e+00);
+    assert_approx_eq!(p[0], 1.000000000000000e+00);
     assert_approx_eq!(h[0], 1.000000000000000e+00);
-    assert_approx_eq!(n0[0], 2.379569102499467e+25 );
+    assert_approx_eq!(n0[0], 6.082122082647290e+23  );
     // Last row:
-    // 6.11558e+16 6.20899e+37 2.096550609129587e+21 7.612604874394090e+39 
-    assert_approx_eq!(e[n_tab-1], 6.11558e+16);
-    assert_approx_eq!(p[n_tab-1], 6.20899e+37);
-    assert_approx_eq!(h[n_tab-1], 2.096550609129587e+21);
-    assert_approx_eq!(n0[n_tab-1], 7.612604874394090e+39 );
+    //4.619231933425792e+15  2.619724025353185e+36  9.350381229926458e+20  1.648497611452358e+39  
+    assert_approx_eq!(e[n_tab-1], 4.619231933425792e+15);
+    assert_approx_eq!(p[n_tab-1], 2.619724025353185e+36);
+    assert_approx_eq!(h[n_tab-1], 9.350381229926458e+20);
+    assert_approx_eq!(n0[n_tab-1], 1.648497611452358e+39  );
 }
 
 pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, usize), Box<dyn Error>> {
@@ -80,7 +81,10 @@ pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, 
     let n_tab = reader.lines()
                             .next()
                             .expect("Unable to read the first line in the EoS file.")?
-                            .parse::<usize>()?;
+                            .trim()
+                            .parse::<usize>()
+                            .expect("Unable to convert the first line in the EoS file to a number.");
+   
 
     println!("{} lines in EoS file {}", n_tab, filename);
 
@@ -94,7 +98,9 @@ pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, 
         let str_rec = res?;
         for str_row in str_rec.iter() {
             i += 1;
-            for (idx, str_val) in str_row.split(' ').enumerate() {
+            for (idx, str_val) in str_row.split(' ')
+                                    .filter(|&x| !x.is_empty())
+                                    .enumerate() {
                 if !str_val.is_empty() {
                     let val_parse = str_val.parse::<f64>();
                     if let Ok(val) = val_parse {
@@ -114,7 +120,7 @@ pub fn read_eos_file(filename: &str, ) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>, 
         }
     }
 // Ordering of the columns vectors:  rho, p, h, n0
-    Ok((e, p, h, n0, n_tab))
+    Ok((e, p, h, n0, n_tab )) //
 }
 
 

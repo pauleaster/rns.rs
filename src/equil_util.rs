@@ -470,8 +470,8 @@ fn tov(i_check:  ICheck,
                 },
             };
             h = r_is_est / 100.0;
-            r_is_check = 0.0; // Dummy variable to keep the compiler happy
-            dr_is_save = 0.0; // Dummy variable to keep the compiler happy
+            r_is_check = 0.0; // Dummy assignment to keep the compiler happy
+            dr_is_save = 0.0; // Dummy assignment to keep the compiler happy
         },
         ICheck::Intermediate | ICheck::Final => {
             r_is_est = *r_is_final;
@@ -877,6 +877,7 @@ pub fn calc_sin_theta(mu: &[f64]) -> ([f64;MDIV], [f64;MDIV]){
     (*sin_theta, *theta)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn print_metric(
     rho: & Array2<f64>,
     gama: &Array2<f64>,
