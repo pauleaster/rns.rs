@@ -18,8 +18,10 @@ use crate::{equil_util::{RnsError, calc_sin_theta, print_header}, rns_plotting::
 fn main()  {
     
     let start = Instant::now();
+    println!("starting");
     let (s,m) = make_grid();
-    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, _) = load_eos("./eos/LS_220_25-Sept-2017.rns").unwrap(); 
+    let (log_e_tab, log_p_tab, log_h_tab, log_n0_tab, _) = load_eos("./eos/eosA").unwrap(); 
+            // LS_220_25-Sept-2017.rns
     let eos_type = &EosType::Table;
     // let opt_gamma_p = None;
     let opt_log_e_tab = &Some(log_e_tab);
@@ -52,7 +54,7 @@ fn main()  {
     print_header();
 
     let base_e_center = 1e15;
-    for e_scalar in 4 .. 5 {
+    for e_scalar in 1 .. 2 {
         let mut continue_iteration = true;
         println!("\n*****************************************");
         println!("e_center = {:0.3}",base_e_center * e_scalar as f64 * CC * CC * KSCALE);
@@ -319,6 +321,8 @@ fn main()  {
     // for (idx,  array) in [rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq].iter_mut().enumerate() {
         // let filename = format!("{}.csv",filenames[idx]);
         // write_array2(array,&filename[..]).unwrap();
+
+
     contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," Ωmax"," Omegamax");
     contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," Ωmax"," Omegamax");
     contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," Ωmax"," Omegamax");
