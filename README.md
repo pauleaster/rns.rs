@@ -1,7 +1,12 @@
 # rns.rs
 
-This is going to become a rust port of the RNS code. The following has been taken from the header at http://www.gravity.phys.uwm.edu/rns/
-EoS files downloaded from the same url.
+This is a rust port of the RNS code. If you want information on this rust port then you can contact me at [Paul Easter](mailto:paul.john.easter@gmail.com).  The code structure, at this point in time, deliberately follows the original structure for the C code. The only difference is that XXX.c is not XXX.rs. However, some functions may have been moved.
+
+So far this code achieves the same numerical result as the C code to around a fractional error of 1e-11, which I found really interesting. Though, as much as possible, I performed a literal translation from C to rust avoiding the temptation to optimise before confirming that the results were comparable. I did perform a couple of optimisations though. I profiled the rust code with flamegraph.rs and found that a significant amount of time was spent in the spin() function, specifically, f64::sin(). I found that a sin() loop was being executed for each run of spin() which generated fixed values each time. So I moved this out to the main() function and passed this data to spin() directly. Even without this optimisation, I found that the rust code was faster than the C code for the same data (when using the `cargo run --release` flag). After this optimisation, the rust code executed in 1.2 seconds and the c code in 2.4 seconds.
+
+The original C code along with the equation of state files were downloaded from http://www.gravity.phys.uwm.edu/rns/. The LS220 equation of state file was downloaded from https://core-gitlfs.tpi.uni-jena.de/eos/ls220. These equation of state files were used for testing.
+
+The description of the RNS code from http://www.gravity.phys.uwm.edu/rns/ follows here:
 
 # Rapidly Rotating Neutron Star
 RNS is a code written by Nikolaos Stergioulas which constructs models of rapidly rotating, relativistic, compact stars using tabulated equations of state which are supplied by the user. Please direct questions about this program to either [Sharon Morsink](mailto:morsink@phys.ualberta.ca) or [Nikolaos Stergioulas](mailto:niksterg@aei-potsdam.mpg.de).
