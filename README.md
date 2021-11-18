@@ -1,4 +1,4 @@
-# rns.rs
+# rns.rs	[![Rust](https://github.com/pauleaster/rns.rs/actions/workflows/rust.yml/badge.svg)](https://github.com/pauleaster/rns.rs/actions/workflows/rust.yml)
 
 This is a rust port of the RNS code. If you want information on this rust port then you can contact me at [Paul Easter](mailto:paul.john.easter@gmail.com).  The code structure, at this point in time, deliberately follows the original structure for the C code. The only difference is that XXX.c is now XXX.rs. However, some functions may have been moved.
 
