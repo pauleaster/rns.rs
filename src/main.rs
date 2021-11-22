@@ -2,7 +2,7 @@ pub mod equil;
 pub mod consts;
 pub mod rns_plotting;
 mod equil_util;
-use std::{process::exit, time::Instant};
+use std::{process::exit, time::Instant,env};
 
 use consts::*;
 use equil::{get_e_p_surface, get_min_enthalpy, load_eos, make_center, make_grid};
@@ -16,7 +16,12 @@ use crate::{equil_util::{RnsError, calc_sin_theta, print_header}, rns_plotting::
 
 
 fn main()  {
-    
+    if let Some(_manifest_dir) = env::var_os("CARGO_MANIFEST_DIR") {
+        println!("Found CARGO_MANIFEST_DIR");
+    } else {
+        println!("Error finding CARGO_MANIFEST_DIR");
+    }
+
     let start = Instant::now();
     println!("starting");
     let (s,m) = make_grid();
@@ -128,14 +133,14 @@ fn main()  {
             continue;
         };
 
-        contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," Ω=0"," NonRotating");
-        contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," Ω=0"," NonRotating");
-        contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," Ω=0"," NonRotating");
-        contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," Ω=0"," NonRotating");
-        contourf(&s, &m, energy, "energy", "./html/energy"," Ω=0"," NonRotating");
-        contourf(&s, &m, pressure, "pressure", "./html/pressure"," Ω=0"," NonRotating");
-        contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," Ω=0"," NonRotating");
-        contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," Ω=0"," NonRotating");
+        contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," Ω=0","_NonRotating");
+        contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," Ω=0","_NonRotating");
+        contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," Ω=0","_NonRotating");
+        contourf(&s, &m, omega, "metric potential associated with spin: ω", "./png/metric_omega"," Ω=0","_NonRotating");
+        contourf(&s, &m, energy, "energy", "./png/energy"," Ω=0","_NonRotating");
+        contourf(&s, &m, pressure, "pressure", "./png/pressure"," Ω=0","_NonRotating");
+        contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," Ω=0","_NonRotating");
+        contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," Ω=0","_NonRotating");
         
         
         let elapsed = start.elapsed().as_secs_f64();
@@ -181,14 +186,14 @@ fn main()  {
             print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
 
             if approx::abs_diff_eq!(r_ratio, 0.75) {
-                contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, energy, "energy", "./html/energy"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, pressure, "pressure", "./html/pressure"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," ~Ωmax/2"," OmegamaxOn2");
-                contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," ~Ωmax/2"," OmegamaxOn2");
+                contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, omega, "metric potential associated with spin: ω", "./png/metric_omega"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, energy, "energy", "./png/energy"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, pressure, "pressure", "./png/pressure"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," ~Ωmax/2","_OmegamaxOn2");
+                contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," ~Ωmax/2","_OmegamaxOn2");
             }
 
             
@@ -323,14 +328,14 @@ fn main()  {
         // write_array2(array,&filename[..]).unwrap();
 
 
-    contourf(&s, &m, rho, "metric potential: ρ", "./html/metric_rho"," Ωmax"," Omegamax");
-    contourf(&s, &m, gama, "metric potential: γ", "./html/metric_gamma"," Ωmax"," Omegamax");
-    contourf(&s, &m, alpha, "metric potential: α", "./html/metric_alpha"," Ωmax"," Omegamax");
-    contourf(&s, &m, omega, "metric potential associated with spin: ω", "./html/metric_omega"," Ωmax"," Omegamax");
-    contourf(&s, &m, energy, "energy", "./html/energy"," Ωmax"," Omegamax");
-    contourf(&s, &m, pressure, "pressure", "./html/pressure"," Ωmax"," Omegamax");
-    contourf(&s, &m, enthalpy, "enthalpy", "./html/enthalpy"," Ωmax"," Omegamax");
-    contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./html/abs_velocity"," Ωmax"," Omegamax");
+    contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," Ωmax","_Omegamax");
+    contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," Ωmax","_Omegamax");
+    contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," Ωmax","_Omegamax");
+    contourf(&s, &m, omega, "metric potential associated with spin: ω", "./png/metric_omega"," Ωmax","_Omegamax");
+    contourf(&s, &m, energy, "energy", "./png/energy"," Ωmax","_Omegamax");
+    contourf(&s, &m, pressure, "pressure", "./png/pressure"," Ωmax","_Omegamax");
+    contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," Ωmax","_Omegamax");
+    contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," Ωmax","_Omegamax");
 
     
 

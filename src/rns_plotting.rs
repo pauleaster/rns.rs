@@ -47,8 +47,9 @@ pub fn contourf(s: &[f64], m: &[f64], array: &Array2<f64>,
                         .y_axis(Axis::new().title(Title::new("angular coordinate, cos θ")));
     plot.set_layout(layout);
     // plot.show_png(800,600);
-    plot.to_html(&format!("{}{}{}",filename, postfix_filename, ".html"));
-    // plot.save(filename,ImageFormat::PNG,1280,900,1.0);
+    // plot.to_html(&format!("{}{}{}",filename, postfix_filename, ".html"));
+    let relative_filename = format!("{}{}{}",filename, postfix_filename, ".png");
+    plot.save(relative_filename,ImageFormat::PNG,1280,900,1.0);
 
     
 }

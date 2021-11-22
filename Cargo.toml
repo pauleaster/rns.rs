@@ -12,7 +12,8 @@ csv = "1.1.6"
 approx = "0.5.0"
 # rayon = "1.5.1"
 ndarray-csv = "0.5.1"
-plotly = { version = "0.6", features = ["kaleido"] }
+# plotly = { version = "0.6", features = ["kaleido"] }
+plotly = {git = "https://github.com/igiagkiozis/plotly", branch = "dev", features = ["kaleido"] }
 
 
 
