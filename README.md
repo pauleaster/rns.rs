@@ -27,7 +27,6 @@ The main website is http://www.gravity.phys.uwm.edu/rns/
 
 The following is the readme from RNS version 2.0
 
-If time permits, I will attempt to port this to rust.
 
 rns.v2.0
 
