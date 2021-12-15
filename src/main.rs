@@ -45,14 +45,14 @@ fn main()  {
             sin_2n_p1_th_m[[n,m]] = (scalar * theta[m]).sin();
         }
     }
-    let mut rho = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut gama = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut alpha = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut omega = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut energy = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut pressure = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut enthalpy = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut velocity_sq = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let rho = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let gama = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let alpha = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let omega = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let energy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let pressure = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let enthalpy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let velocity_sq = &mut Array2::<f64>::zeros((SDIV, MDIV));
     let mut r_e = 0.0;
 
     println!();
@@ -79,7 +79,7 @@ fn main()  {
         
 
         sphere(&s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, 
-                e_center, p_center, p_surface, e_surface, &mut rho, &mut gama, &mut alpha, &mut omega, &mut r_e);
+                e_center, p_center, p_surface, e_surface, rho, gama, alpha, omega, &mut r_e);
 
         /* THE PROCEDURE SPIN() WILL COMPUTE THE METRIC OF A STAR WITH
             GIVEN OBLATENESS. THE OBLATENESS IS SPECIFIED BY GIVING 
