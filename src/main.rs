@@ -21,7 +21,7 @@ fn main()  {
     } else {
         println!("Error finding CARGO_MANIFEST_DIR");
     }
-
+    let mut plot_timing = 0.0;
     let start = Instant::now();
     println!("starting");
     let (s,m) = make_grid();
@@ -45,14 +45,14 @@ fn main()  {
             sin_2n_p1_th_m[[n,m]] = (scalar * theta[m]).sin();
         }
     }
-    let mut rho = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut gama = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut alpha = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
-    let mut omega = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut energy = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut pressure = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut enthalpy = &mut Array2::<f64>::zeros((SDIV, MDIV));
-    let mut velocity_sq = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let rho = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let gama = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let alpha = &mut Array2::<f64>::zeros((SDIV, MDIV)); 
+    let omega = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let energy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let pressure = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let enthalpy = &mut Array2::<f64>::zeros((SDIV, MDIV));
+    let velocity_sq = &mut Array2::<f64>::zeros((SDIV, MDIV));
     let mut r_e = 0.0;
 
     println!();
@@ -79,7 +79,7 @@ fn main()  {
         
 
         sphere(&s, opt_log_e_tab, opt_log_p_tab, opt_log_h_tab, eos_type, None, 
-                e_center, p_center, p_surface, e_surface, &mut rho, &mut gama, &mut alpha, &mut omega, &mut r_e);
+                e_center, p_center, p_surface, e_surface, rho, gama, alpha, omega, &mut r_e);
 
         /* THE PROCEDURE SPIN() WILL COMPUTE THE METRIC OF A STAR WITH
             GIVEN OBLATENESS. THE OBLATENESS IS SPECIFIED BY GIVING 
@@ -132,7 +132,8 @@ fn main()  {
             continue_iteration = false;
             continue;
         };
-
+        let start_of_first_plots = start.elapsed().as_secs_f64();
+        println!("Start initial plots");
         contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," Ω=0","_NonRotating");
         contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," Ω=0","_NonRotating");
         contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," Ω=0","_NonRotating");
@@ -141,8 +142,9 @@ fn main()  {
         contourf(&s, &m, pressure, "pressure", "./png/pressure"," Ω=0","_NonRotating");
         contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," Ω=0","_NonRotating");
         contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," Ω=0","_NonRotating");
-        
-        
+        println!("End initial plots");
+        let end_of_first_plots = start.elapsed().as_secs_f64();
+        plot_timing +=  end_of_first_plots - start_of_first_plots;
         let elapsed = start.elapsed().as_secs_f64();
 
         print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
@@ -186,6 +188,8 @@ fn main()  {
             print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
 
             if approx::abs_diff_eq!(r_ratio, 0.75) {
+                let start_of_middle_plots = start.elapsed().as_secs_f64();
+                println!("Start plotting");
                 contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," ~Ωmax/2","_OmegamaxOn2");
                 contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," ~Ωmax/2","_OmegamaxOn2");
                 contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," ~Ωmax/2","_OmegamaxOn2");
@@ -194,6 +198,9 @@ fn main()  {
                 contourf(&s, &m, pressure, "pressure", "./png/pressure"," ~Ωmax/2","_OmegamaxOn2");
                 contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," ~Ωmax/2","_OmegamaxOn2");
                 contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," ~Ωmax/2","_OmegamaxOn2");
+                let end_of_middle_plots = start.elapsed().as_secs_f64();
+                println!("End plotting");
+                plot_timing += end_of_middle_plots - start_of_middle_plots;
             }
 
             
@@ -313,33 +320,70 @@ fn main()  {
             OF R_RATIO WHICH GIVES THE DESIRED STAR. */
 
 
-            println!("\n\nElapsed time = {:0.5}\n\n",start.elapsed().as_secs_f64());
+
             
             print_header();
             print_ns(r_ratio, e_center, *mass, *mass_0, *rr_e, *big_omega, *omega_k, *ang_mom);
         } // if continue_iteration
     } // for
 
-    // let filenames = ["rho", "gama", "alpha", "omega", "energy", "pressure", "enthalpy", "velocity_sq"];
-    
-    
-    // for (idx,  array) in [rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq].iter_mut().enumerate() {
-        // let filename = format!("{}.csv",filenames[idx]);
-        // write_array2(array,&filename[..]).unwrap();
+    {   let start_of_final_plots = start.elapsed().as_secs_f64();
+        println!("Start final plots");
+        let rho: &Array2<f64> = &*rho;
+        let gama: &Array2<f64> = &*gama;
+        let alpha: &Array2<f64> = &*alpha;
+        let omega: &Array2<f64> = &*omega;
+        let energy: &Array2<f64> = &*energy;
+        let pressure: &Array2<f64> = &*pressure;
+        let enthalpy: &Array2<f64> = &*enthalpy;
+        let velocity: &Array2<f64> = &velocity_sq.mapv(f64::sqrt);
+
+        let filenames = ["rho", "gama", "alpha", "omega", 
+                                    "energy", "pressure", 
+                                    "enthalpy", "velocity"];
+
+        let names = ["metric potential: ρ",
+                                "metric potential: γ",
+                                "metric potential: α",
+                                "metric potential associated with spin: ω",
+                                "energy",
+                                "pressure",
+                                "enthalpy",
+                                "abs(velocity)"];
 
 
-    contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," Ωmax","_Omegamax");
-    contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," Ωmax","_Omegamax");
-    contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," Ωmax","_Omegamax");
-    contourf(&s, &m, omega, "metric potential associated with spin: ω", "./png/metric_omega"," Ωmax","_Omegamax");
-    contourf(&s, &m, energy, "energy", "./png/energy"," Ωmax","_Omegamax");
-    contourf(&s, &m, pressure, "pressure", "./png/pressure"," Ωmax","_Omegamax");
-    contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," Ωmax","_Omegamax");
-    contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," Ωmax","_Omegamax");
+        for (idx,x) in [rho, gama, alpha, omega, energy, pressure, enthalpy, velocity].iter_mut().enumerate() {
+            contourf(&s, &m, x, 
+                names[idx], 
+                &format!("./png/{}",filenames[idx]),
+                " Ωmax",
+                "_Omegamax");    
+        }
+        println!("End final plots");
+        let end_of_final_plots = start.elapsed().as_secs_f64();
+        plot_timing += end_of_final_plots - start_of_final_plots;
+        
+        
+        // for (idx,  array) in [rho, gama, alpha, omega, energy, pressure, enthalpy, velocity_sq].iter_mut().enumerate() {
+            // let filename = format!("{}.csv",filenames[idx]);
+            // write_array2(array,&filename[..]).unwrap();
 
-    
 
-//  }
+        // contourf(&s, &m, rho, "metric potential: ρ", "./png/metric_rho"," Ωmax","_Omegamax");
+        // contourf(&s, &m, gama, "metric potential: γ", "./png/metric_gamma"," Ωmax","_Omegamax");
+        // contourf(&s, &m, alpha, "metric potential: α", "./png/metric_alpha"," Ωmax","_Omegamax");
+        // contourf(&s, &m, omega, "metric potential associated with spin: ω", "./png/metric_omega"," Ωmax","_Omegamax");
+        // contourf(&s, &m, energy, "energy", "./png/energy"," Ωmax","_Omegamax");
+        // contourf(&s, &m, pressure, "pressure", "./png/pressure"," Ωmax","_Omegamax");
+        // contourf(&s, &m, enthalpy, "enthalpy", "./png/enthalpy"," Ωmax","_Omegamax");
+        // contourf(&s, &m, &velocity_sq.mapv(f64::sqrt), "abs(velocity)", "./png/abs_velocity"," Ωmax","_Omegamax");
+
+    }    
+
+    let elapsed = start.elapsed().as_secs_f64();
+    println!("\n\nElapsed time = {:0.5}",elapsed);
+    println!("Plotting time = {:0.5}\n\n",plot_timing);
+    println!("Computational time = {:0.5}\n\n",elapsed - plot_timing);
 
 
     
